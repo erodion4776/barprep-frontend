@@ -1,57 +1,61 @@
 import axios from 'axios'
 
-// Automatically uses local backend in dev
-// and your real Render URL in production
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+// Supabase Edge Functions - replaces Render backend
+const SUPABASE_URL      = import.meta.env.VITE_SUPABASE_URL
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
+const FUNCTIONS_URL     = `${SUPABASE_URL}/functions/v1`
 
+// Create axios instance pointing to Supabase Edge Functions
 const api = axios.create({
-  baseURL: BASE_URL,
-  timeout: 60000, // 60 seconds for AI responses
+  baseURL: FUNCTIONS_URL,
+  timeout: 60000,
   headers: {
     'Content-Type': 'application/json',
-  },
+    'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+    'apikey': SUPABASE_ANON_KEY
+  }
 })
 
-// Request interceptor for logging
+// Request logging
 api.interceptors.request.use((config) => {
-  console.log(`API Request: ${config.method?.toUpperCase()} ${config.url}`)
+  console.log(`API: ${config.method?.toUpperCase()} ${config.url}`)
   return config
 })
 
-// Response interceptor for error handling
+// Response error handling
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    const message = error.response?.data?.detail 
-      || error.message 
-      || 'Something went wrong'
+    const message = 
+      error.response?.data?.error   ||
+      error.response?.data?.message ||
+      error.message                 ||
+      'Something went wrong'
     console.error('API Error:', message)
     return Promise.reject(new Error(message))
   }
 )
 
-// API functions your components will call
 export const apiClient = {
-
   // Health check
-  getHealth: () => 
-    api.get('/api/health'),
+  getHealth: () =>
+    api.get('/health'),
 
-  // Get daily affirmation
-  getAffirmation: () => 
-    api.get('/api/affirmation'),
+  // Daily affirmation
+  getAffirmation: () =>
+    api.get('/affirmation'),
 
-  // Chat with AI
+  // AI Chat with RAG
   chat: (message, history = []) =>
-    api.post('/api/chat', { message, history }),
+    api.post('/chat', { message, history }),
 
-  // Ingest a webpage URL
+  // Ingest webpage URL
   ingestUrl: (url) =>
-    api.post('/api/ingest/url', { url }),
+    api.post('/ingest-url', { url }),
 
-  // Ingest a YouTube video
+  // Ingest YouTube video
   ingestYoutube: (url) =>
-    api.post('/api/ingest/youtube', { url }),
+    api.post('/ingest-youtube', { url }),
 }
 
 export default api

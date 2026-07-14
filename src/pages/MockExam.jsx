@@ -28,7 +28,7 @@ export default function MockExam() {
     setLoading(true)
     setFeedback(null)
     setAnswer('')
-    try:
+    try {
       const prompt =
         `Generate a realistic MBE-style bar exam multiple choice 
         question about ${topic}. Format exactly like this:
@@ -151,12 +151,12 @@ export default function MockExam() {
             </button>
           </div>
 
-          <div className="prose prose-slate max-w-none text-sm 
-                          sm:text-base">
+          <div className="prose prose-slate max-w-none 
+                          text-sm sm:text-base">
             <ReactMarkdown>{question}</ReactMarkdown>
           </div>
 
-          {/* Answer Buttons - Stack on mobile */}
+          {/* Answer Buttons */}
           <div className="space-y-2">
             <p className="text-sm font-medium text-slate-700">
               Your Answer:
@@ -217,8 +217,8 @@ export default function MockExam() {
             >
               {loading ? 'Loading...' : 'Next Question →'}
             </button>
-            <button 
-              onClick={reset} 
+            <button
+              onClick={reset}
               className="btn-secondary flex-1 min-h-[44px]"
             >
               Change Topic

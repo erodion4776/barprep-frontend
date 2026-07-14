@@ -31,13 +31,16 @@ export default function StudyModules() {
   }
 
   return (
-    <div className="space-y-6 max-w-3xl mx-auto">
+    <div className="space-y-6 max-w-3xl mx-auto 
+                    px-4 sm:px-6 lg:px-0">
 
       {/* Header */}
       <div>
-        <h1>Study Modules</h1>
-        <p className="text-slate-500 mt-1">
-          Add study materials for the AI to learn from. 
+        <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">
+          Study Modules
+        </h1>
+        <p className="text-slate-500 mt-1 text-sm sm:text-base">
+          Add study materials for the AI to learn from.
           Paste a bar prep website URL or a YouTube lecture link.
         </p>
       </div>
@@ -51,13 +54,14 @@ export default function StudyModules() {
         {/* Type Toggle */}
         <div className="flex gap-2 mb-4">
           {[
-            { value: 'url',     label: '🌐 Website URL'      },
-            { value: 'youtube', label: '▶️ YouTube Video'    },
+            { value: 'url',     label: '🌐 Website'  },
+            { value: 'youtube', label: '▶️ YouTube'  },
           ].map(({ value, label }) => (
             <button
               key={value}
               onClick={() => setType(value)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium
+              className={`flex-1 sm:flex-none px-4 py-2.5 
+                rounded-lg text-sm font-medium
                 transition-colors duration-200
                 ${type === value
                   ? 'bg-blue-600 text-white'
@@ -82,10 +86,10 @@ export default function StudyModules() {
               onChange={(e) => setUrl(e.target.value)}
               placeholder={
                 type === 'url'
-                  ? 'https://www.example-barprep.com/torts'
+                  ? 'https://www.law.cornell.edu/wex/tort'
                   : 'https://www.youtube.com/watch?v=...'
               }
-              className="input-field"
+              className="input-field text-sm sm:text-base"
               disabled={loading}
               required
             />
@@ -94,7 +98,7 @@ export default function StudyModules() {
           <button
             type="submit"
             disabled={loading || !url.trim()}
-            className="btn-primary w-full"
+            className="btn-primary w-full min-h-[44px]"
           >
             {loading ? (
               <span className="flex items-center justify-center gap-2">
@@ -109,17 +113,29 @@ export default function StudyModules() {
 
         {/* Success */}
         {result && (
-          <div className="mt-4 p-4 bg-green-50 border border-green-200 
-                          rounded-lg text-green-700 text-sm">
+          <div className="mt-4 p-4 bg-green-50 border 
+                          border-green-200 rounded-lg 
+                          text-green-700 text-sm">
             ✅ {result}
           </div>
         )}
 
         {/* Error */}
         {error && (
-          <div className="mt-4 p-4 bg-red-50 border border-red-200 
-                          rounded-lg text-red-700 text-sm">
-            ❌ {error}
+          <div className="mt-4 p-4 bg-red-50 border 
+                          border-red-200 rounded-lg 
+                          text-red-700 text-sm">
+            <p className="font-medium mb-1">❌ Failed to process</p>
+            <p>{error}</p>
+            {(error.includes('429') || 
+              error.includes('rate limit') ||
+              error.includes('Too Many')) && (
+              <p className="mt-2 text-amber-700 bg-amber-50 
+                            border border-amber-200 rounded p-2">
+                ⏳ YouTube is rate limiting requests.
+                Please wait 5 minutes and try again.
+              </p>
+            )}
           </div>
         )}
       </div>
@@ -130,26 +146,18 @@ export default function StudyModules() {
           💡 Tips For Best Results
         </h3>
         <ul className="space-y-2 text-sm text-slate-600">
-          <li className="flex items-start gap-2">
-            <span className="text-blue-600 mt-0.5">•</span>
-            Add bar prep websites like Themis, Barbri outlines, 
-            or legal study guides
-          </li>
-          <li className="flex items-start gap-2">
-            <span className="text-blue-600 mt-0.5">•</span>
-            Add YouTube bar prep lecture videos for the AI 
-            to use as coaching material
-          </li>
-          <li className="flex items-start gap-2">
-            <span className="text-blue-600 mt-0.5">•</span>
-            After adding materials go to AI Coach and ask 
-            questions about the topics you added
-          </li>
-          <li className="flex items-start gap-2">
-            <span className="text-blue-600 mt-0.5">•</span>
-            YouTube videos must have captions enabled 
-            for transcription to work
-          </li>
+          {[
+            'Add Cornell Law pages like law.cornell.edu/wex/tort',
+            'Add YouTube bar prep lecture videos for AI coaching',
+            'After adding materials ask the AI Coach questions',
+            'YouTube videos must have captions enabled',
+            'Wait 30 seconds between each URL submission',
+          ].map((tip, i) => (
+            <li key={i} className="flex items-start gap-2">
+              <span className="text-blue-600 mt-0.5 shrink-0">•</span>
+              {tip}
+            </li>
+          ))}
         </ul>
       </div>
 

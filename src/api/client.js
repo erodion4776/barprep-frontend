@@ -33,27 +33,39 @@ api.interceptors.response.use(
 )
 
 export const apiClient = {
-  getHealth: () =>
-    api.get('/health'),
+  // Core
+  getHealth:      () => api.get('/health'),
+  getAffirmation: () => api.get('/affirmation'),
 
-  getAffirmation: () =>
-    api.get('/affirmation'),
-
+  // Chat
   chat: (message, history = []) =>
     api.post('/chat', { message, history }),
 
-  ingestUrl: (url) =>
-    api.post('/ingest-url', { url }),
+  // Ingest
+  ingestUrl:      (url) => api.post('/ingest-url',      { url }),
+  ingestYoutube:  (url) => api.post('/ingest-youtube',  { url }),
 
-  ingestYoutube: (url) =>
-    api.post('/ingest-youtube', { url }),
-
-  // New dedicated mock exam endpoint - fast Groq direct
+  // Mock Exam
   generateQuestion: (topic) =>
     api.post('/mock-exam', { action: 'generate', topic }),
-
   evaluateAnswer: (question, answer) =>
     api.post('/mock-exam', { action: 'evaluate', question, answer }),
+
+  // Tutorials
+  getModules:    (topic = '', all = false) =>
+    api.get(`/get-modules?topic=${topic}&all=${all}`),
+  processVideo:  (url, topic, order_index = 0) =>
+    api.post('/process-video', { url, topic, order_index }),
+
+  // PDF
+  processPdf: (storage_path, filename, document_id) =>
+    api.post('/process-pdf', { storage_path, filename, document_id }),
+
+  // Admin Auth
+  adminLogin:  (password) =>
+    api.post('/admin-auth', { action: 'login',  password }),
+  adminVerify: (token) =>
+    api.post('/admin-auth', { action: 'verify', password: token }),
 }
 
 export default api

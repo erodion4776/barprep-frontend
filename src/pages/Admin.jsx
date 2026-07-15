@@ -19,11 +19,12 @@ const TOPICS = [
 const TABS = ['Videos', 'Web Pages', 'PDF Upload', 'Modules']
 
 export default function Admin() {
-  const navigate               = useNavigate()
+  const navigate = useNavigate()
+
   const [activeTab, setActiveTab] = useState('Videos')
-  const [loading, setLoading]  = useState(false)
-  const [result, setResult]    = useState('')
-  const [error, setError]      = useState('')
+  const [loading, setLoading]     = useState(false)
+  const [result, setResult]       = useState('')
+  const [error, setError]         = useState('')
 
   // Video form
   const [videoUrl, setVideoUrl]     = useState('')
@@ -31,35 +32,32 @@ export default function Admin() {
   const [videoOrder, setVideoOrder] = useState(0)
 
   // Web page form
-  const [pageUrl, setPageUrl]       = useState('')
+  const [pageUrl, setPageUrl] = useState('')
 
   // PDF form
-  const [pdfFile, setPdfFile]       = useState(null)
-  const [uploading, setUploading]   = useState(false)
+  const [pdfFile, setPdfFile]     = useState(null)
+  const [uploading, setUploading] = useState(false)
 
-  // Modules list
-  const [modules, setModules]       = useState([])
+  // Modules
+  const [modules, setModules]               = useState([])
   const [loadingModules, setLoadingModules] = useState(false)
 
-  // Check admin auth on mount
   useEffect(() => {
     const token = localStorage.getItem('admin_token')
     if (!token) {
       navigate('/admin/login')
       return
     }
-    // Verify token
-    apiClient.adminVerify(token).then(res => {
-      if (!res.data.valid) {
-        localStorage.removeItem('admin_token')
-        navigate('/admin/login')
-      }
-    }).catch(() => {
-      navigate('/admin/login')
-    })
+    apiClient.adminVerify(token)
+      .then(res => {
+        if (!res.data.valid) {
+          localStorage.removeItem('admin_token')
+          navigate('/admin/login')
+        }
+      })
+      .catch(() => navigate('/admin/login'))
   }, [])
 
-  // Load modules when tab changes
   useEffect(() => {
     if (activeTab === 'Modules') loadModules()
   }, [activeTab])
@@ -81,11 +79,15 @@ export default function Admin() {
     navigate('/admin/login')
   }
 
+  const clearFeedback = () => {
+    setResult('')
+    setError('')
+  }
+
   const handleVideoSubmit = async (e) => {
     e.preventDefault()
     setLoading(true)
-    setResult('')
-    setError('')
+    clearFeedback()
 
     try {
       const res = await apiClient.processVideo(
@@ -93,7 +95,17 @@ export default function Admin() {
         videoTopic,
         videoOrder
       )
-      setResult(res.data.message || 'Video processed successfully!')
+
+      let message = res.data.message || 'Course module created!'
+
+      // Inform admin if description was used instead of transcript
+      if (res.data.source_type === 'description') {
+        message += ' (Note: transcript was blocked by YouTube so video description was used instead - AI coaching may be less detailed)'
+      } else if (res.data.source_type === 'transcript') {
+        message += ' Full transcript extracted successfully!'
+      }
+
+      setResult(message)
       setVideoUrl('')
       setVideoOrder(prev => prev + 1)
     } catch (err) {
@@ -106,8 +118,7 @@ export default function Admin() {
   const handlePageSubmit = async (e) => {
     e.preventDefault()
     setLoading(true)
-    setResult('')
-    setError('')
+    clearFeedback()
 
     try {
       const res = await apiClient.ingestUrl(pageUrl)
@@ -125,11 +136,9 @@ export default function Admin() {
     if (!pdfFile) return
 
     setUploading(true)
-    setResult('')
-    setError('')
+    clearFeedback()
 
     try {
-      // 1. Get Supabase client for storage upload
       const { createClient } = await import(
         'https://esm.sh/@supabase/supabase-js@2'
       )
@@ -141,7 +150,6 @@ export default function Admin() {
       const filename    = pdfFile.name
       const storagePath = `pdfs/${Date.now()}_${filename}`
 
-      // 2. Upload to Supabase Storage
       const { error: uploadError } = await supabase
         .storage
         .from('documents')
@@ -149,29 +157,27 @@ export default function Admin() {
 
       if (uploadError) throw new Error(uploadError.message)
 
-      // 3. Save document record
       const { data: docData, error: docError } = await supabase
         .from('user_documents')
         .insert({
           filename,
-          file_type: pdfFile.type,
-          file_size: pdfFile.size,
+          file_type:    pdfFile.type,
+          file_size:    pdfFile.size,
           storage_path: storagePath,
-          is_indexed: false
+          is_indexed:   false
         })
         .select()
         .single()
 
       if (docError) throw new Error(docError.message)
 
-      // 4. Process PDF in edge function
       const res = await apiClient.processPdf(
         storagePath,
         filename,
         docData.id
       )
 
-      setResult(res.data.message || 'PDF uploaded and indexed successfully!')
+      setResult(res.data.message || 'PDF uploaded and indexed!')
       setPdfFile(null)
       e.target.reset()
     } catch (err) {
@@ -194,27 +200,19 @@ export default function Admin() {
             Manage course content for BarPrep AI
           </p>
         </div>
-        <button
-          onClick={handleLogout}
-          className="btn-secondary text-sm"
-        >
+        <button onClick={handleLogout} className="btn-secondary text-sm">
           Logout
         </button>
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 bg-slate-100 p-1 rounded-lg
-                      overflow-x-auto">
+      <div className="flex gap-1 bg-slate-100 p-1 rounded-lg overflow-x-auto">
         {TABS.map((tab) => (
           <button
             key={tab}
-            onClick={() => {
-              setActiveTab(tab)
-              setResult('')
-              setError('')
-            }}
+            onClick={() => { setActiveTab(tab); clearFeedback() }}
             className={`px-4 py-2 rounded-md text-sm font-medium
-              whitespace-nowrap transition-colors duration-200 flex-1
+              whitespace-nowrap transition-colors flex-1
               ${activeTab === tab
                 ? 'bg-white text-blue-600 shadow-sm'
                 : 'text-slate-600 hover:text-slate-900'
@@ -225,21 +223,33 @@ export default function Admin() {
         ))}
       </div>
 
-      {/* Result / Error */}
+      {/* Result */}
       {result && (
         <div className="p-4 bg-green-50 border border-green-200
-                        rounded-lg text-green-700 text-sm">
-          ✅ {result}
-        </div>
-      )}
-      {error && (
-        <div className="p-4 bg-red-50 border border-red-200
-                        rounded-lg text-red-700 text-sm">
-          ❌ {error}
+                        rounded-lg text-green-700 text-sm flex
+                        items-start justify-between gap-3">
+          <span>✅ {result}</span>
+          <button
+            onClick={() => setResult('')}
+            className="shrink-0 text-green-500 hover:text-green-700"
+          >✕</button>
         </div>
       )}
 
-      {/* Tab: Videos */}
+      {/* Error */}
+      {error && (
+        <div className="p-4 bg-red-50 border border-red-200
+                        rounded-lg text-red-700 text-sm flex
+                        items-start justify-between gap-3">
+          <span>❌ {error}</span>
+          <button
+            onClick={() => setError('')}
+            className="shrink-0 text-red-500 hover:text-red-700"
+          >✕</button>
+        </div>
+      )}
+
+      {/* ---- Videos Tab ---- */}
       {activeTab === 'Videos' && (
         <div className="card space-y-5">
           <div>
@@ -247,12 +257,13 @@ export default function Admin() {
               Add YouTube Lecture
             </h2>
             <p className="text-slate-500 text-sm mt-1">
-              AI will extract transcript create course module
-              generate summary and outline automatically
+              AI automatically extracts the transcript and creates
+              a full course module with summary and outline.
             </p>
           </div>
 
           <form onSubmit={handleVideoSubmit} className="space-y-4">
+
             <div>
               <label className="block text-sm font-medium
                                  text-slate-700 mb-1.5">
@@ -273,7 +284,7 @@ export default function Admin() {
               <div>
                 <label className="block text-sm font-medium
                                    text-slate-700 mb-1.5">
-                  Topic / Subject
+                  Bar Exam Topic
                 </label>
                 <select
                   value={videoTopic}
@@ -286,7 +297,6 @@ export default function Admin() {
                   ))}
                 </select>
               </div>
-
               <div>
                 <label className="block text-sm font-medium
                                    text-slate-700 mb-1.5">
@@ -311,30 +321,46 @@ export default function Admin() {
               {loading ? (
                 <span className="flex items-center justify-center gap-2">
                   <LoadingSpinner size="sm" />
-                  Processing Video... This may take 30-60 seconds
+                  Processing Video... (up to 60 seconds)
                 </span>
               ) : (
-                'Add Video Course Module →'
+                'Create Course Module →'
               )}
             </button>
           </form>
 
-          {/* Helpful YouTube Links */}
-          <div className="bg-slate-50 rounded-lg p-4">
-            <p className="text-sm font-medium text-slate-700 mb-2">
-              🎥 Recommended Bar Prep YouTube Channels:
+          {/* How it works */}
+          <div className="bg-slate-50 border border-slate-200
+                          rounded-lg p-4 space-y-2">
+            <p className="text-sm font-semibold text-slate-700">
+              ⚙️ What happens automatically:
+            </p>
+            <ol className="text-sm text-slate-600 space-y-1
+                           list-decimal list-inside">
+              <li>Gets video title and thumbnail from YouTube API</li>
+              <li>Extracts transcript (uses description as fallback)</li>
+              <li>Groq AI generates course summary and outline</li>
+              <li>Indexes content for AI chat search</li>
+              <li>Module appears on tutorials page immediately</li>
+            </ol>
+          </div>
+
+          {/* Recommended videos */}
+          <div className="space-y-2">
+            <p className="text-sm font-medium text-slate-700">
+              🎥 Recommended Bar Prep Channels:
             </p>
             <ul className="text-sm text-slate-600 space-y-1">
               <li>• Search "Barbri bar exam [topic]" on YouTube</li>
               <li>• Search "Themis bar review [topic]"</li>
-              <li>• Search "Law school bar exam lecture [topic]"</li>
-              <li>• Video must have captions/subtitles enabled</li>
+              <li>• Search "quimbee bar exam [topic]"</li>
+              <li>• Videos with CC captions work best</li>
             </ul>
           </div>
         </div>
       )}
 
-      {/* Tab: Web Pages */}
+      {/* ---- Web Pages Tab ---- */}
       {activeTab === 'Web Pages' && (
         <div className="card space-y-5">
           <div>
@@ -371,7 +397,7 @@ export default function Admin() {
               {loading ? (
                 <span className="flex items-center justify-center gap-2">
                   <LoadingSpinner size="sm" />
-                  Scraping Page...
+                  Scraping...
                 </span>
               ) : (
                 'Add Web Page →'
@@ -379,23 +405,33 @@ export default function Admin() {
             </button>
           </form>
 
-          {/* Quick Add Buttons */}
+          {/* Quick Add */}
           <div className="space-y-3">
             <p className="text-sm font-medium text-slate-700">
               Quick Add Cornell Law Pages:
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {[
-                { label: 'Constitutional Law',  url: 'https://www.law.cornell.edu/wex/constitutional_law' },
-                { label: 'Contracts',           url: 'https://www.law.cornell.edu/wex/contract' },
-                { label: 'Torts',               url: 'https://www.law.cornell.edu/wex/tort' },
-                { label: 'Criminal Law',        url: 'https://www.law.cornell.edu/wex/criminal_law' },
-                { label: 'Civil Procedure',     url: 'https://www.law.cornell.edu/wex/civil_procedure' },
-                { label: 'Evidence',            url: 'https://www.law.cornell.edu/wex/evidence' },
-                { label: 'Real Property',       url: 'https://www.law.cornell.edu/wex/property' },
-                { label: 'Family Law',          url: 'https://www.law.cornell.edu/wex/family_law' },
-                { label: 'Negligence',          url: 'https://www.law.cornell.edu/wex/negligence' },
-                { label: 'Due Process',         url: 'https://www.law.cornell.edu/wex/due_process' },
+                { label: 'Constitutional Law',
+                  url: 'https://www.law.cornell.edu/wex/constitutional_law' },
+                { label: 'Contracts',
+                  url: 'https://www.law.cornell.edu/wex/contract' },
+                { label: 'Torts',
+                  url: 'https://www.law.cornell.edu/wex/tort' },
+                { label: 'Criminal Law',
+                  url: 'https://www.law.cornell.edu/wex/criminal_law' },
+                { label: 'Civil Procedure',
+                  url: 'https://www.law.cornell.edu/wex/civil_procedure' },
+                { label: 'Evidence',
+                  url: 'https://www.law.cornell.edu/wex/evidence' },
+                { label: 'Real Property',
+                  url: 'https://www.law.cornell.edu/wex/property' },
+                { label: 'Family Law',
+                  url: 'https://www.law.cornell.edu/wex/family_law' },
+                { label: 'Negligence',
+                  url: 'https://www.law.cornell.edu/wex/negligence' },
+                { label: 'Due Process',
+                  url: 'https://www.law.cornell.edu/wex/due_process' },
               ].map(({ label, url }) => (
                 <button
                   key={label}
@@ -414,7 +450,7 @@ export default function Admin() {
         </div>
       )}
 
-      {/* Tab: PDF Upload */}
+      {/* ---- PDF Tab ---- */}
       {activeTab === 'PDF Upload' && (
         <div className="card space-y-5">
           <div>
@@ -428,38 +464,31 @@ export default function Admin() {
           </div>
 
           <form onSubmit={handlePdfUpload} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium
-                                 text-slate-700 mb-1.5">
-                Select PDF File
-              </label>
-              <div className="border-2 border-dashed border-slate-300
-                              rounded-lg p-6 text-center
-                              hover:border-blue-400 transition-colors">
-                <input
-                  type="file"
-                  accept=".pdf,.txt,.doc,.docx"
-                  onChange={(e) => setPdfFile(e.target.files[0])}
-                  className="w-full text-sm text-slate-500
-                             file:mr-4 file:py-2 file:px-4
-                             file:rounded-lg file:border-0
-                             file:text-sm file:font-medium
-                             file:bg-blue-50 file:text-blue-700
-                             hover:file:bg-blue-100"
-                  disabled={uploading}
-                />
-                {pdfFile && (
-                  <p className="mt-2 text-sm text-slate-600">
-                    Selected: {pdfFile.name}
-                    ({(pdfFile.size / 1024 / 1024).toFixed(2)} MB)
-                  </p>
-                )}
-                {!pdfFile && (
-                  <p className="text-slate-400 text-sm mt-2">
-                    PDF, TXT, DOC files up to 10MB
-                  </p>
-                )}
-              </div>
+            <div className="border-2 border-dashed border-slate-300
+                            rounded-lg p-6 text-center
+                            hover:border-blue-400 transition-colors">
+              <input
+                type="file"
+                accept=".pdf,.txt,.doc,.docx"
+                onChange={(e) => setPdfFile(e.target.files?.[0] || null)}
+                className="w-full text-sm text-slate-500
+                           file:mr-4 file:py-2 file:px-4
+                           file:rounded-lg file:border-0
+                           file:text-sm file:font-medium
+                           file:bg-blue-50 file:text-blue-700
+                           hover:file:bg-blue-100"
+                disabled={uploading}
+              />
+              {pdfFile ? (
+                <p className="mt-2 text-sm text-green-600 font-medium">
+                  ✅ {pdfFile.name}
+                  ({(pdfFile.size / 1024 / 1024).toFixed(2)} MB)
+                </p>
+              ) : (
+                <p className="text-slate-400 text-sm mt-2">
+                  PDF TXT DOC files up to 10MB
+                </p>
+              )}
             </div>
 
             <button
@@ -484,25 +513,21 @@ export default function Admin() {
               💡 After uploading
             </p>
             <p className="text-sm text-blue-700">
-              The AI Chat will automatically search your uploaded
-              documents when answering questions. Students can ask
-              about specific content from your PDFs directly in chat.
+              Students can ask the AI Chat questions about
+              your uploaded documents directly.
             </p>
           </div>
         </div>
       )}
 
-      {/* Tab: Modules */}
+      {/* ---- Modules Tab ---- */}
       {activeTab === 'Modules' && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold text-slate-900">
               Course Modules ({modules.length})
             </h2>
-            <button
-              onClick={loadModules}
-              className="btn-secondary text-sm"
-            >
+            <button onClick={loadModules} className="btn-secondary text-sm">
               Refresh
             </button>
           </div>
@@ -512,7 +537,8 @@ export default function Admin() {
               <LoadingSpinner size="lg" text="Loading modules..." />
             </div>
           ) : modules.length === 0 ? (
-            <div className="card text-center py-12">
+            <div className="card text-center py-12 space-y-2">
+              <div className="text-4xl">📚</div>
               <p className="text-slate-500">
                 No modules yet. Add YouTube videos in the Videos tab.
               </p>
@@ -521,8 +547,7 @@ export default function Admin() {
             <div className="space-y-3">
               {modules.map((module) => (
                 <div key={module.id}
-                     className="card flex items-start gap-4">
-                  {/* Thumbnail */}
+                     className="card flex items-start gap-4 p-4">
                   {module.thumbnail_url && (
                     <img
                       src={module.thumbnail_url}
@@ -530,14 +555,12 @@ export default function Admin() {
                       className="w-24 h-16 object-cover rounded-lg
                                  shrink-0 bg-slate-200"
                       onError={(e) => {
-                        e.target.style.display = 'none'
+                        e.currentTarget.style.display = 'none'
                       }}
                     />
                   )}
-
-                  {/* Info */}
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
+                    <div className="flex items-center gap-2 flex-wrap mb-1">
                       <span className="badge bg-blue-100 text-blue-700
                                        text-xs px-2 py-0.5">
                         {module.topic}
@@ -550,23 +573,19 @@ export default function Admin() {
                         {module.is_published ? 'Published' : 'Draft'}
                       </span>
                     </div>
-                    <h3 className="font-medium text-slate-900 mt-1
-                                   text-sm truncate">
+                    <h3 className="font-medium text-slate-900 text-sm truncate">
                       {module.title}
                     </h3>
                     <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">
                       {module.ai_summary}
                     </p>
                   </div>
-
-                  {/* Video link */}
                   {module.video_url && (
                     <a
                       href={module.video_url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-blue-600 text-xs hover:underline
-                                 shrink-0"
+                      className="text-blue-600 text-xs hover:underline shrink-0"
                     >
                       Watch ↗
                     </a>

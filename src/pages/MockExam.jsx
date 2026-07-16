@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { apiClient } from '../api/client'
+import { apiClient, supabase } from '../api/client'
 import LoadingSpinner from '../components/LoadingSpinner'
 import ReactMarkdown from 'react-markdown'
 
@@ -71,6 +71,18 @@ export default function MockExam() {
 
       setFeedback(fb)
       setPhase('feedback')
+
+      // Save attempt to Supabase
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        await supabase.from('attempts').insert({
+          user_id: user.id,
+          question,
+          answer,
+          feedback: fb,
+          topic
+        })
+      }
     } catch (err) {
       setError(err.message || 'Failed to evaluate answer.')
     } finally {

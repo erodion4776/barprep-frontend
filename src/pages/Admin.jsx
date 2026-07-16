@@ -639,67 +639,82 @@ export default function Admin() {
       )}
 
       {/* ---- Users & Activity Tab ---- */}
-      {activeTab === 'Users & Activity' && (
-        <div className="space-y-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-lg font-semibold text-slate-900">
-                Registered Users & Performance
-              </h2>
-              <p className="text-slate-500 text-sm mt-0.5">
-                Monitor student registration and active practice exam activity.
-              </p>
-            </div>
-            <button onClick={loadUsersAndAttempts} className="btn-secondary text-sm">
-              Refresh
-            </button>
-          </div>
+      {activeTab === 'Users & Activity' && (() => {
+        const combinedUsers = [...usersList]
+        const userIds = new Set(usersList.map(u => u.id))
+        attemptsList.forEach(att => {
+          if (att.user_id && !userIds.has(att.user_id)) {
+            combinedUsers.push({
+              id: att.user_id,
+              email: `Pre-sync User (UID: ${att.user_id.slice(0, 8)}...)`,
+              created_at: att.created_at,
+              isSynthetic: true
+            })
+            userIds.add(att.user_id)
+          }
+        })
 
-          {/* Quick Stats Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="card bg-slate-50 border border-slate-200 p-4">
-              <div className="text-slate-500 text-xs font-semibold uppercase tracking-wider">
-                Profile Synced Users
+        return (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-900">
+                  Registered Users & Performance
+                </h2>
+                <p className="text-slate-500 text-sm mt-0.5">
+                  Monitor student registration and active practice exam activity.
+                </p>
               </div>
-              <div className="text-2xl font-bold text-slate-900 mt-1">
-                {usersList.length}
-              </div>
+              <button onClick={loadUsersAndAttempts} className="btn-secondary text-sm">
+                Refresh
+              </button>
             </div>
-            <div className="card bg-slate-50 border border-slate-200 p-4">
-              <div className="text-slate-500 text-xs font-semibold uppercase tracking-wider">
-                Practice Attempts
-              </div>
-              <div className="text-2xl font-bold text-slate-900 mt-1">
-                {attemptsList.length}
-              </div>
-            </div>
-          </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Left/Middle Column: Users Profiles */}
-            <div className="lg:col-span-2 space-y-4">
-              <h3 className="text-sm font-semibold text-slate-800 uppercase tracking-wider">
-                Registered Users (Profiles Table)
-              </h3>
-
-              {loadingUsers ? (
-                <div className="card py-8 flex justify-center">
-                  <LoadingSpinner size="md" text="Loading users..." />
+            {/* Quick Stats Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="card bg-slate-50 border border-slate-200 p-4">
+                <div className="text-slate-500 text-xs font-semibold uppercase tracking-wider">
+                  Profile Synced Users
                 </div>
-              ) : usersError ? (
-                <div className="card space-y-4 bg-amber-50/50 border-amber-200">
-                  <div className="flex items-start gap-3">
-                    <span className="text-xl">💡</span>
-                    <div>
-                      <h4 className="font-semibold text-amber-900">Supabase Auth & Profiles Setup</h4>
-                      <p className="text-amber-800 text-sm mt-1 leading-relaxed">
-                        Supabase manages users automatically in the private <code>auth.users</code> table. To view users on the frontend, copy/paste the SQL below into your <strong>Supabase SQL Editor</strong> to create a synced <code>profiles</code> table with a trigger!
-                      </p>
-                    </div>
-                  </div>
+                <div className="text-2xl font-bold text-slate-900 mt-1">
+                  {usersList.length}
+                </div>
+              </div>
+              <div className="card bg-slate-50 border border-slate-200 p-4">
+                <div className="text-slate-500 text-xs font-semibold uppercase tracking-wider">
+                  Practice Attempts
+                </div>
+                <div className="text-2xl font-bold text-slate-900 mt-1">
+                  {attemptsList.length}
+                </div>
+              </div>
+            </div>
 
-                  <div className="bg-slate-900 rounded-lg p-4 text-xs font-mono text-slate-300 overflow-x-auto max-h-[300px] select-all">
-                    <pre>{`-- 1. Create a public profiles table
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Left/Middle Column: Users Profiles */}
+              <div className="lg:col-span-2 space-y-4">
+                <h3 className="text-sm font-semibold text-slate-800 uppercase tracking-wider">
+                  Registered Users (Profiles Table)
+                </h3>
+
+                {loadingUsers ? (
+                  <div className="card py-8 flex justify-center">
+                    <LoadingSpinner size="md" text="Loading users..." />
+                  </div>
+                ) : usersError ? (
+                  <div className="card space-y-4 bg-amber-50/50 border-amber-200">
+                    <div className="flex items-start gap-3">
+                      <span className="text-xl">💡</span>
+                      <div>
+                        <h4 className="font-semibold text-amber-900">Supabase Auth & Profiles Setup</h4>
+                        <p className="text-amber-800 text-sm mt-1 leading-relaxed">
+                          Supabase manages users automatically in the private <code>auth.users</code> table. To view users on the frontend, copy/paste the SQL below into your <strong>Supabase SQL Editor</strong> to create a synced <code>profiles</code> table with a trigger!
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="bg-slate-900 rounded-lg p-4 text-xs font-mono text-slate-300 overflow-x-auto max-h-[300px] select-all">
+                      <pre>{`-- 1. Create a public profiles table
 create table public.profiles (
   id uuid references auth.users on delete cascade primary key,
   email text,
@@ -727,131 +742,144 @@ $$ language plpgsql security definer;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute procedure public.handle_new_user();`}</pre>
+                    </div>
+                    <p className="text-slate-500 text-xs text-center italic">
+                      Tip: Click once to select all, then paste into your Supabase Dashboard SQL Editor!
+                    </p>
                   </div>
-                  <p className="text-slate-500 text-xs text-center italic">
-                    Tip: Click once to select all, then paste into your Supabase Dashboard SQL Editor!
-                  </p>
+                ) : combinedUsers.length === 0 ? (
+                  <div className="card text-center py-8">
+                    <p className="text-slate-500 text-sm">No user profiles synced yet. When users sign up, they will appear here!</p>
+                  </div>
+                ) : (
+                  <div className="card p-0 overflow-hidden border border-slate-200">
+                    <table className="min-w-full divide-y divide-slate-200 text-sm text-left">
+                      <thead className="bg-slate-50 font-medium text-slate-700">
+                        <tr>
+                          <th className="px-4 py-3">User Email</th>
+                          <th className="px-4 py-3">UUID</th>
+                          <th className="px-4 py-3">Status</th>
+                          <th className="px-4 py-3">Joined</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 text-slate-600">
+                        {combinedUsers.map((usr) => (
+                          <tr key={usr.id} className="hover:bg-slate-50/50 transition-colors">
+                            <td className="px-4 py-3 font-medium text-slate-900">{usr.email || 'Anonymous'}</td>
+                            <td className="px-4 py-3 font-mono text-xs text-slate-400 select-all">{usr.id}</td>
+                            <td className="px-4 py-3 text-xs">
+                              {usr.isSynthetic ? (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-50 text-amber-800 border border-amber-100">
+                                  Attempt Only
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-50 text-green-800 border border-green-100">
+                                  Profile Synced
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 text-xs text-slate-500">
+                              {usr.created_at ? new Date(usr.created_at).toLocaleDateString() : 'N/A'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+              {/* Right Column: Key info about Supabase Auth */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-semibold text-slate-800 uppercase tracking-wider">
+                  How Supabase Auth Works
+                </h3>
+                <div className="card space-y-4 text-sm text-slate-600 leading-relaxed">
+                  <div>
+                    <h4 className="font-semibold text-slate-900 flex items-center gap-1.5 mb-1">
+                      🔐 Auth Table
+                    </h4>
+                    <p className="text-xs">
+                      All users who sign up in your app are immediately added to the protected <code>auth.users</code> database view.
+                    </p>
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-slate-900 flex items-center gap-1.5 mb-1">
+                      🛡️ Enterprise Security
+                    </h4>
+                    <p className="text-xs">
+                      Supabase automatically handles secure password encryption, session JWT generation, and login state cookies.
+                    </p>
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-slate-900 flex items-center gap-1.5 mb-1">
+                      🔗 Attempts Tracking
+                    </h4>
+                    <p className="text-xs">
+                      When students take mock exams, their test attempts are linked directly to their Supabase UID for performance logging.
+                    </p>
+                  </div>
                 </div>
-              ) : usersList.length === 0 ? (
-                <div className="card text-center py-8">
-                  <p className="text-slate-500 text-sm">No user profiles synced yet. When users sign up, they will appear here!</p>
+              </div>
+            </div>
+
+            {/* Student Exam Attempts section */}
+            <div className="space-y-4 pt-4">
+              <h3 className="text-sm font-semibold text-slate-800 uppercase tracking-wider">
+                Student Quiz & Exam Attempts Log ({attemptsList.length})
+              </h3>
+              
+              {attemptsList.length === 0 ? (
+                <div className="card text-center py-12">
+                  <p className="text-slate-500">No mock exam attempts recorded yet.</p>
                 </div>
               ) : (
-                <div className="card p-0 overflow-hidden border border-slate-200">
-                  <table className="min-w-full divide-y divide-slate-200 text-sm text-left">
-                    <thead className="bg-slate-50 font-medium text-slate-700">
-                      <tr>
-                        <th className="px-4 py-3">User Email</th>
-                        <th className="px-4 py-3">UUID</th>
-                        <th className="px-4 py-3">Joined</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 text-slate-600">
-                      {usersList.map((usr) => (
-                        <tr key={usr.id} className="hover:bg-slate-50/50 transition-colors">
-                          <td className="px-4 py-3 font-medium text-slate-900">{usr.email || 'Anonymous'}</td>
-                          <td className="px-4 py-3 font-mono text-xs text-slate-400 select-all">{usr.id}</td>
-                          <td className="px-4 py-3 text-xs text-slate-500">
-                            {usr.created_at ? new Date(usr.created_at).toLocaleDateString() : 'N/A'}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                <div className="space-y-4">
+                  {attemptsList.map((attempt) => (
+                    <div key={attempt.id} className="card border border-slate-200 bg-white shadow-sm p-5 space-y-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-semibold px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full">
+                            {attempt.topic}
+                          </span>
+                          <span className="text-xs text-slate-400 font-mono select-all">
+                            User ID: {attempt.user_id}
+                          </span>
+                        </div>
+                        <span className="text-xs text-slate-500">
+                          {attempt.created_at ? new Date(attempt.created_at).toLocaleString() : 'N/A'}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                        <div className="space-y-1">
+                          <span className="text-xs font-semibold text-slate-400 uppercase">Question:</span>
+                          <p className="text-slate-800 bg-slate-50 p-2.5 rounded-lg border border-slate-100 line-clamp-3" title={attempt.question}>
+                            {attempt.question}
+                          </p>
+                        </div>
+                        <div className="space-y-1">
+                          <span className="text-xs font-semibold text-slate-400 uppercase">Student Answer:</span>
+                          <p className="text-slate-800 bg-slate-50 p-2.5 rounded-lg border border-slate-100 line-clamp-3" title={attempt.answer}>
+                            {attempt.answer}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="bg-blue-50/50 rounded-lg p-3.5 border border-blue-100/50">
+                        <span className="text-xs font-semibold text-blue-800 uppercase block mb-1">AI Feedback & Score:</span>
+                        <p className="text-slate-700 text-sm leading-relaxed line-clamp-3" title={attempt.feedback}>
+                          {attempt.feedback}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
-
-            {/* Right Column: Key info about Supabase Auth */}
-            <div className="space-y-4">
-              <h3 className="text-sm font-semibold text-slate-800 uppercase tracking-wider">
-                How Supabase Auth Works
-              </h3>
-              <div className="card space-y-4 text-sm text-slate-600 leading-relaxed">
-                <div>
-                  <h4 className="font-semibold text-slate-900 flex items-center gap-1.5 mb-1">
-                    🔐 Auth Table
-                  </h4>
-                  <p className="text-xs">
-                    All users who sign up in your app are immediately added to the protected <code>auth.users</code> database view.
-                  </p>
-                </div>
-                <div>
-                  <h4 className="font-semibold text-slate-900 flex items-center gap-1.5 mb-1">
-                    🛡️ Enterprise Security
-                  </h4>
-                  <p className="text-xs">
-                    Supabase automatically handles secure password encryption, session JWT generation, and login state cookies.
-                  </p>
-                </div>
-                <div>
-                  <h4 className="font-semibold text-slate-900 flex items-center gap-1.5 mb-1">
-                    🔗 Attempts Tracking
-                  </h4>
-                  <p className="text-xs">
-                    When students take mock exams, their test attempts are linked directly to their Supabase UID for performance logging.
-                  </p>
-                </div>
-              </div>
-            </div>
           </div>
-
-          {/* Student Exam Attempts section */}
-          <div className="space-y-4 pt-4">
-            <h3 className="text-sm font-semibold text-slate-800 uppercase tracking-wider">
-              Student Quiz & Exam Attempts Log ({attemptsList.length})
-            </h3>
-            
-            {attemptsList.length === 0 ? (
-              <div className="card text-center py-12">
-                <p className="text-slate-500">No mock exam attempts recorded yet.</p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {attemptsList.map((attempt) => (
-                  <div key={attempt.id} className="card border border-slate-200 bg-white shadow-sm p-5 space-y-3">
-                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-semibold px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full">
-                          {attempt.topic}
-                        </span>
-                        <span className="text-xs text-slate-400 font-mono select-all">
-                          User ID: {attempt.user_id}
-                        </span>
-                      </div>
-                      <span className="text-xs text-slate-500">
-                        {attempt.created_at ? new Date(attempt.created_at).toLocaleString() : 'N/A'}
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                      <div className="space-y-1">
-                        <span className="text-xs font-semibold text-slate-400 uppercase">Question:</span>
-                        <p className="text-slate-800 bg-slate-50 p-2.5 rounded-lg border border-slate-100 line-clamp-3" title={attempt.question}>
-                          {attempt.question}
-                        </p>
-                      </div>
-                      <div className="space-y-1">
-                        <span className="text-xs font-semibold text-slate-400 uppercase">Student Answer:</span>
-                        <p className="text-slate-800 bg-slate-50 p-2.5 rounded-lg border border-slate-100 line-clamp-3" title={attempt.answer}>
-                          {attempt.answer}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="bg-blue-50/50 rounded-lg p-3.5 border border-blue-100/50">
-                      <span className="text-xs font-semibold text-blue-800 uppercase block mb-1">AI Feedback & Score:</span>
-                      <p className="text-slate-700 text-sm leading-relaxed line-clamp-3" title={attempt.feedback}>
-                        {attempt.feedback}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+        )
+      })()}
 
     </div>
   )

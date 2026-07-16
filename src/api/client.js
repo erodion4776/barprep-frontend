@@ -101,22 +101,23 @@ export const apiClient = {
 
   processVideo: (url, topic, order_index = 0) =>
     backendApi.post('/api/process-video', { url, topic, order_index }),
+
+  // ---- Chat Sessions ----
+
+  getSessions: () =>
+    api.get('/chat-sessions'),
+
+  createSession: (title, messages = []) =>
+    api.post('/chat-sessions', { action: 'create', title, messages }),
+
+  updateSession: (id, title, messages) =>
+    api.post('/chat-sessions', { action: 'update', id, title, messages }),
+
+  getSession: (id) =>
+    api.post('/chat-sessions', { action: 'get', id }),
+
+  deleteSession: (id) =>
+    api.post('/chat-sessions', { action: 'delete', id }),
 }
-// Add these to your apiClient object:
 
-// Chat Sessions
-getSessions: () =>
-  api.get('/chat-sessions'),
-
-createSession: (title, messages = []) =>
-  api.post('/chat-sessions', { action: 'create', title, messages }),
-
-updateSession: (id, title, messages) =>
-  api.post('/chat-sessions', { action: 'update', id, title, messages }),
-
-getSession: (id) =>
-  api.post('/chat-sessions', { action: 'get', id }),
-
-deleteSession: (id) =>
-  api.post('/chat-sessions', { action: 'delete', id }),
 export default api

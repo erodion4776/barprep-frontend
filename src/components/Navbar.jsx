@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
+import { supabase } from '../api/client'
 
 const links = [
   { to: '/',          label: 'Home'      },
@@ -12,6 +13,28 @@ const links = [
 export default function Navbar() {
   const { pathname } = useLocation()
   const [menuOpen, setMenuOpen] = useState(false)
+  const [user, setUser] = useState(null)
+
+  useEffect(() => {
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null)
+    })
+
+    // Listen to changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null)
+    })
+
+    return () => {
+      subscription?.unsubscribe()
+    }
+  }, [])
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut()
+    setMenuOpen(false)
+  }
 
   return (
     <nav className="bg-white border-b border-slate-200
@@ -51,8 +74,24 @@ export default function Navbar() {
               </Link>
             ))}
             <div className="h-6 w-px bg-slate-200 mx-2" />
-            <Link to="/login" className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-900">Login</Link>
-            <Link to="/signup" className="btn-primary">Sign up</Link>
+            {user ? (
+              <div className="flex items-center gap-3">
+                <span className="text-sm font-medium text-slate-600 max-w-[150px] truncate" title={user.email}>
+                  {user.email}
+                </span>
+                <button
+                  onClick={handleSignOut}
+                  className="btn-secondary text-sm !py-1.5"
+                >
+                  Sign Out
+                </button>
+              </div>
+            ) : (
+              <>
+                <Link to="/login" className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-900">Login</Link>
+                <Link to="/signup" className="btn-primary">Sign up</Link>
+              </>
+            )}
           </div>
 
           {/* Mobile Hamburger */}
@@ -99,10 +138,24 @@ export default function Navbar() {
               {label}
             </Link>
           ))}
-          <div className="border-t border-slate-100 pt-2 mt-2 space-y-1">
-            <Link to="/login" onClick={() => setMenuOpen(false)} className="block px-4 py-3 text-sm font-medium text-slate-600 hover:bg-slate-100">Login</Link>
-            <Link to="/signup" onClick={() => setMenuOpen(false)} className="block px-4 py-3 text-sm font-medium text-blue-600 hover:bg-blue-50">Sign up</Link>
-          </div>
+          {user ? (
+            <div className="border-t border-slate-100 pt-3 mt-2 space-y-1">
+              <div className="px-4 py-2 text-xs font-semibold text-slate-400 truncate">
+                {user.email}
+              </div>
+              <button
+                onClick={handleSignOut}
+                className="w-full text-left block px-4 py-3 text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+              >
+                Sign Out
+              </button>
+            </div>
+          ) : (
+            <div className="border-t border-slate-100 pt-2 mt-2 space-y-1">
+              <Link to="/login" onClick={() => setMenuOpen(false)} className="block px-4 py-3 text-sm font-medium text-slate-600 hover:bg-slate-100">Login</Link>
+              <Link to="/signup" onClick={() => setMenuOpen(false)} className="block px-4 py-3 text-sm font-medium text-blue-600 hover:bg-blue-50">Sign up</Link>
+            </div>
+          )}
         </div>
       )}
     </nav>

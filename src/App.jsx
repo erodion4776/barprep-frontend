@@ -8,6 +8,8 @@ import Tutorials from './pages/Tutorials'
 import ModuleDetail from './pages/ModuleDetail'
 import Admin from './pages/Admin'
 import AdminLogin from './pages/AdminLogin'
+import Login from './pages/Login'
+import Signup from './pages/Signup'
 
 export default function App() {
   return (
@@ -23,6 +25,8 @@ export default function App() {
           <Route path="/tutorials/:id" element={<ModuleDetail />} />
           <Route path="/admin"         element={<Admin />} />
           <Route path="/admin/login"   element={<AdminLogin />} />
+          <Route path="/login"         element={<Login />} />
+          <Route path="/signup"        element={<Signup />} />
         </Routes>
       </main>
     </div>

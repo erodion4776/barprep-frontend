@@ -15,15 +15,36 @@ export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [user, setUser] = useState(null)
 
+  const syncProfile = async (u) => {
+    if (!u) return
+    try {
+      await supabase.from('profiles').upsert({
+        id: u.id,
+        email: u.email,
+        created_at: u.created_at || new Date().toISOString()
+      }, { onConflict: 'id' })
+    } catch (err) {
+      console.warn('Silent profile sync issue (table/policy might not be ready yet):', err)
+    }
+  }
+
   useEffect(() => {
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null)
+      const currentUser = session?.user ?? null
+      setUser(currentUser)
+      if (currentUser) {
+        syncProfile(currentUser)
+      }
     })
 
     // Listen to changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null)
+      const currentUser = session?.user ?? null
+      setUser(currentUser)
+      if (currentUser) {
+        syncProfile(currentUser)
+      }
     })
 
     return () => {

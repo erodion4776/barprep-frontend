@@ -1,4 +1,6 @@
-import { Link } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import { supabase } from '../api/client'
 import Affirmation from '../components/Affirmation'
 
 const features = [
@@ -26,6 +28,30 @@ const features = [
 ]
 
 export default function Home() {
+  const [user, setUser] = useState(null)
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null)
+    })
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null)
+    })
+
+    return () => {
+      subscription?.unsubscribe()
+    }
+  }, [])
+
+  const handleNav = (e, to) => {
+    if (!user) {
+      e.preventDefault()
+      navigate('/login')
+    }
+  }
+
   return (
     <div className="space-y-8">
 
@@ -40,10 +66,18 @@ export default function Home() {
           practice harder, and walk into exam day with confidence.
         </p>
         <div className="flex items-center justify-center gap-4 pt-2">
-          <Link to="/chat" className="btn-primary text-base px-6 py-3">
+          <Link 
+            to="/chat" 
+            onClick={(e) => handleNav(e, '/chat')}
+            className="btn-primary text-base px-6 py-3"
+          >
             Start Studying →
           </Link>
-          <Link to="/mock-exam" className="btn-secondary text-base px-6 py-3">
+          <Link 
+            to="/mock-exam" 
+            onClick={(e) => handleNav(e, '/mock-exam')}
+            className="btn-secondary text-base px-6 py-3"
+          >
             Take Mock Exam
           </Link>
         </div>
@@ -60,14 +94,18 @@ export default function Home() {
             <div key={to} className="card hover:shadow-md 
                                      transition-shadow duration-200 
                                      flex flex-col">
-              <div className="text-3xl mb-3">{icon}</div>
-              <h3 className="text-slate-900 mb-2">{title}</h3>
-              <p className="text-slate-500 text-sm flex-1 mb-4">
-                {description}
-              </p>
-              <Link to={to} className="btn-primary text-sm text-center">
-                {cta}
-              </Link>
+               <div className="text-3xl mb-3">{icon}</div>
+               <h3 className="text-slate-900 mb-2">{title}</h3>
+               <p className="text-slate-500 text-sm flex-1 mb-4">
+                 {description}
+               </p>
+               <Link 
+                 to={to} 
+                 onClick={(e) => handleNav(e, to)}
+                 className="btn-primary text-sm text-center"
+               >
+                 {cta}
+               </Link>
             </div>
           ))}
         </div>

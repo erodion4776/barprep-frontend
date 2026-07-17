@@ -8,29 +8,22 @@ const GREETING = {
   content:
     "Hello! I'm your BarPrep AI Coach. I can help you understand " +
     "legal concepts, answer practice questions, and explain bar " +
-    "exam topics step-by-step. What would you like to study today?"
+    "exam topics step-by-step. What would you like to study today?",
+  sources: [],
 }
 
 export default function Chat() {
-  // Chat state
-  const [messages, setMessages]         = useState([GREETING])
-  const [input, setInput]               = useState('')
-  const [loading, setLoading]           = useState(false)
-
-  // Session state
-  const [sessions, setSessions]         = useState([])
+  const [messages, setMessages]               = useState([GREETING])
+  const [input, setInput]                     = useState('')
+  const [loading, setLoading]                 = useState(false)
+  const [sessions, setSessions]               = useState([])
   const [activeSessionId, setActiveSessionId] = useState(null)
   const [sessionsLoading, setSessionsLoading] = useState(true)
-  const [sidebarOpen, setSidebarOpen]   = useState(false)
+  const [sidebarOpen, setSidebarOpen]         = useState(false)
 
   const bottomRef = useRef(null)
 
-  // Load sessions on mount
-  useEffect(() => {
-    loadSessions()
-  }, [])
-
-  // Auto scroll
+  useEffect(() => { loadSessions() }, [])
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, loading])
@@ -58,9 +51,9 @@ export default function Chat() {
     try {
       const res = await apiClient.getSession(sessionId)
       const session = res.data.session
-
-      if (session && session.messages) {
-        setMessages(session.messages)
+      if (session?.messages) {
+        // Ensure old messages without a sources field still render cleanly
+        setMessages(session.messages.map(m => ({ sources: [], ...m })))
         setActiveSessionId(session.id)
       }
     } catch (err) {
@@ -69,34 +62,28 @@ export default function Chat() {
     setSidebarOpen(false)
   }
 
-  const saveSession = async (updatedMessages) => {
-    // Get title from first user message
+  // Fire-and-forget so the UI unblocks the moment we get the reply.
+  const saveSessionAsync = (updatedMessages, sessionIdOverride) => {
     const firstUserMsg = updatedMessages.find(m => m.role === 'user')
     const title = firstUserMsg
       ? firstUserMsg.content.substring(0, 80)
       : 'New Chat'
 
-    try {
-      if (activeSessionId) {
-        // Update existing session
-        await apiClient.updateSession(
-          activeSessionId,
-          title,
-          updatedMessages
-        )
-      } else {
-        // Create new session
-        const res = await apiClient.createSession(
-          title,
-          updatedMessages
-        )
-        setActiveSessionId(res.data.session.id)
+    const currentId = sessionIdOverride ?? activeSessionId
+
+    ;(async () => {
+      try {
+        if (currentId) {
+          await apiClient.updateSession(currentId, title, updatedMessages)
+        } else {
+          const res = await apiClient.createSession(title, updatedMessages)
+          setActiveSessionId(res.data.session.id)
+        }
+        loadSessions()
+      } catch (err) {
+        console.error('Failed to save session:', err)
       }
-      // Refresh session list
-      loadSessions()
-    } catch (err) {
-      console.error('Failed to save session:', err)
-    }
+    })()
   }
 
   const deleteSession = async (sessionId, e) => {
@@ -104,9 +91,7 @@ export default function Chat() {
     try {
       await apiClient.deleteSession(sessionId)
       setSessions(prev => prev.filter(s => s.id !== sessionId))
-      if (activeSessionId === sessionId) {
-        startNewChat()
-      }
+      if (activeSessionId === sessionId) startNewChat()
     } catch (err) {
       console.error('Failed to delete session:', err)
     }
@@ -120,44 +105,42 @@ export default function Chat() {
     setInput('')
     setLoading(true)
 
-    const updatedMessages = [
+    const withUser = [
       ...messages,
-      { role: 'user', content: userMessage }
+      { role: 'user', content: userMessage, sources: [] },
     ]
-    setMessages(updatedMessages)
+    setMessages(withUser)
 
     try {
-      const history = updatedMessages
+      const history = withUser
         .filter(m => m.role !== 'system')
         .slice(-10)
         .map(({ role, content }) => ({ role, content }))
 
       const res = await apiClient.chat(userMessage, history)
+      const reply   = res.data.reply || ''
+      const sources = Array.isArray(res.data.sources) ? res.data.sources : []
 
       const finalMessages = [
-        ...updatedMessages,
-        { role: 'assistant', content: res.data.reply }
+        ...withUser,
+        { role: 'assistant', content: reply, sources },
       ]
       setMessages(finalMessages)
-
-      // Auto save session
-      await saveSession(finalMessages)
-
+      saveSessionAsync(finalMessages)   // no await; UI unblocks immediately
     } catch (err) {
-      const finalMessages = [
-        ...updatedMessages,
+      setMessages([
+        ...withUser,
         {
           role: 'assistant',
-          content: `I encountered an error: ${err.message}. Please try again.`
-        }
-      ]
-      setMessages(finalMessages)
+          content: `I encountered an error: ${err.message}. Please try again.`,
+          sources: [],
+        },
+      ])
     } finally {
       setLoading(false)
     }
   }
 
-  // Format date for sidebar
   const formatDate = (dateStr) => {
     const date = new Date(dateStr)
     const now  = new Date()
@@ -165,12 +148,16 @@ export default function Chat() {
     const mins = Math.floor(diff / 60000)
     const hrs  = Math.floor(diff / 3600000)
     const days = Math.floor(diff / 86400000)
-
     if (mins < 1)  return 'Just now'
     if (mins < 60) return `${mins}m ago`
     if (hrs < 24)  return `${hrs}h ago`
     if (days < 7)  return `${days}d ago`
     return date.toLocaleDateString()
+  }
+
+  const hostFromUrl = (url) => {
+    try { return new URL(url).hostname.replace(/^www\./, '') }
+    catch { return url }
   }
 
   return (
@@ -186,27 +173,20 @@ export default function Chat() {
         transition-transform duration-300 ease-in-out
         lg:rounded-l-xl overflow-hidden shrink-0
       `}>
-
-        {/* Sidebar Header */}
         <div className="p-3 border-b border-slate-700">
-          <button
-            onClick={startNewChat}
+          <button onClick={startNewChat}
             className="w-full flex items-center gap-3 px-3 py-2.5
                        rounded-lg border border-slate-600
                        hover:bg-slate-800 transition-colors
-                       text-sm font-medium"
-          >
+                       text-sm font-medium">
             <span className="text-lg">+</span>
             New Chat
           </button>
         </div>
 
-        {/* Session List */}
         <div className="flex-1 overflow-y-auto py-2">
           {sessionsLoading ? (
-            <div className="flex justify-center py-8">
-              <LoadingSpinner size="sm" />
-            </div>
+            <div className="flex justify-center py-8"><LoadingSpinner size="sm" /></div>
           ) : sessions.length === 0 ? (
             <p className="text-center text-slate-500 text-xs py-8 px-4">
               No chat history yet. Start a conversation!
@@ -214,39 +194,24 @@ export default function Chat() {
           ) : (
             <div className="space-y-0.5 px-2">
               {sessions.map((session) => (
-                <button
-                  key={session.id}
-                  onClick={() => loadSession(session.id)}
-                  className={`w-full text-left px-3 py-2.5 rounded-lg
-                    text-sm transition-colors duration-150 group
-                    flex items-center justify-between gap-2
+                <button key={session.id} onClick={() => loadSession(session.id)}
+                  className={`w-full text-left px-3 py-2.5 rounded-lg text-sm
+                    transition-colors duration-150 group flex items-center justify-between gap-2
                     ${activeSessionId === session.id
                       ? 'bg-slate-700 text-white'
-                      : 'text-slate-300 hover:bg-slate-800 hover:text-white'
-                    }`}
-                >
+                      : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}>
                   <div className="flex-1 min-w-0">
-                    <p className="truncate text-sm">
-                      {session.title || 'Untitled Chat'}
-                    </p>
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      {formatDate(session.updated_at)}
-                    </p>
+                    <p className="truncate text-sm">{session.title || 'Untitled Chat'}</p>
+                    <p className="text-xs text-slate-500 mt-0.5">{formatDate(session.updated_at)}</p>
                   </div>
-
-                  {/* Delete button */}
-                  <button
-                    onClick={(e) => deleteSession(session.id, e)}
+                  <button onClick={(e) => deleteSession(session.id, e)}
                     className="opacity-0 group-hover:opacity-100
                                text-slate-500 hover:text-red-400
                                transition-opacity shrink-0 p-1"
-                    title="Delete chat"
-                  >
-                    <svg className="w-4 h-4" fill="none"
-                         stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    title="Delete chat">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                     </svg>
                   </button>
                 </button>
@@ -255,7 +220,6 @@ export default function Chat() {
           )}
         </div>
 
-        {/* Sidebar Footer */}
         <div className="p-3 border-t border-slate-700">
           <p className="text-xs text-slate-500 text-center">
             {sessions.length} conversation{sessions.length !== 1 ? 's' : ''}
@@ -263,70 +227,74 @@ export default function Chat() {
         </div>
       </div>
 
-      {/* Mobile Sidebar Overlay */}
       {sidebarOpen && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-50 z-30 lg:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-30 lg:hidden"
+             onClick={() => setSidebarOpen(false)} />
       )}
 
-      {/* ---- Main Chat Area ---- */}
+      {/* ---- Main Chat ---- */}
       <div className="flex-1 flex flex-col min-w-0">
 
-        {/* Chat Header */}
-        <div className="flex items-center justify-between px-4 py-3
-                        border-b border-slate-200 bg-white">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 bg-white">
           <div className="flex items-center gap-3">
-            {/* Mobile sidebar toggle */}
-            <button
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="lg:hidden p-1.5 rounded-lg text-slate-500
-                         hover:bg-slate-100 transition-colors"
-            >
-              <svg className="w-5 h-5" fill="none"
-                   stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round"
-                      strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+            <button onClick={() => setSidebarOpen(!sidebarOpen)}
+              className="lg:hidden p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 transition-colors">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
               </svg>
             </button>
             <div>
-              <h1 className="text-lg font-bold text-slate-900">
-                AI Coach
-              </h1>
-              <p className="text-xs text-slate-500">
-                Ask any bar exam question
-              </p>
+              <h1 className="text-lg font-bold text-slate-900">AI Coach</h1>
+              <p className="text-xs text-slate-500">Ask any bar exam question</p>
             </div>
           </div>
-          <button
-            onClick={startNewChat}
-            className="btn-secondary text-xs px-3 py-1.5"
-          >
+          <button onClick={startNewChat} className="btn-secondary text-xs px-3 py-1.5">
             + New Chat
           </button>
         </div>
 
-        {/* Messages */}
-        <div className="flex-1 overflow-y-auto px-4 py-4
-                        space-y-4 min-h-0 bg-slate-50">
+        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 min-h-0 bg-slate-50">
           {messages.map((msg, i) => (
-            <div
-              key={i}
-              className={`flex ${msg.role === 'user'
-                ? 'justify-end'
-                : 'justify-start'}`}
-            >
+            <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
               <div className={`max-w-[85%] rounded-xl px-4 py-3 text-sm
                 ${msg.role === 'user'
                   ? 'bg-blue-600 text-white rounded-br-sm'
-                  : 'bg-white border border-slate-200 text-slate-800 rounded-bl-sm shadow-sm'
-                }`}
-              >
+                  : 'bg-white border border-slate-200 text-slate-800 rounded-bl-sm shadow-sm'}`}>
                 {msg.role === 'assistant' ? (
-                  <div className="prose prose-sm prose-slate max-w-none">
-                    <ReactMarkdown>{msg.content}</ReactMarkdown>
-                  </div>
+                  <>
+                    <div className="prose prose-sm prose-slate max-w-none">
+                      <ReactMarkdown>{msg.content}</ReactMarkdown>
+                    </div>
+
+                    {msg.sources && msg.sources.length > 0 && (
+                      <div className="mt-3 pt-3 border-t border-slate-100">
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
+                          Sources
+                        </p>
+                        <ol className="space-y-1.5">
+                          {msg.sources.map((s) => (
+                            <li key={s.number} className="text-xs flex gap-2 items-start">
+                              <span className="font-mono font-bold text-slate-400 shrink-0">
+                                [{s.number}]
+                              </span>
+                              <a
+                                href={s.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-blue-600 hover:text-blue-800 hover:underline break-words"
+                                title={s.snippet}
+                              >
+                                {s.title}
+                                <span className="text-slate-400 ml-1 font-normal">
+                                  ({hostFromUrl(s.url)})
+                                </span>
+                              </a>
+                            </li>
+                          ))}
+                        </ol>
+                      </div>
+                    )}
+                  </>
                 ) : (
                   <p>{msg.content}</p>
                 )}
@@ -336,9 +304,7 @@ export default function Chat() {
 
           {loading && (
             <div className="flex justify-start">
-              <div className="bg-white border border-slate-200
-                              rounded-xl rounded-bl-sm px-4 py-3
-                              shadow-sm">
+              <div className="bg-white border border-slate-200 rounded-xl rounded-bl-sm px-4 py-3 shadow-sm">
                 <LoadingSpinner size="sm" text="Thinking..." />
               </div>
             </div>
@@ -347,10 +313,8 @@ export default function Chat() {
           <div ref={bottomRef} />
         </div>
 
-        {/* Input */}
         <form onSubmit={sendMessage}
-              className="flex gap-3 px-4 py-3 border-t
-                         border-slate-200 bg-white">
+              className="flex gap-3 px-4 py-3 border-t border-slate-200 bg-white">
           <input
             type="text"
             value={input}
@@ -362,8 +326,7 @@ export default function Chat() {
           <button
             type="submit"
             disabled={loading || !input.trim()}
-            className="btn-primary px-5 shrink-0 min-h-[44px]"
-          >
+            className="btn-primary px-5 shrink-0 min-h-[44px]">
             {loading ? '...' : 'Send'}
           </button>
         </form>

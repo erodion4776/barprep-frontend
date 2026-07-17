@@ -1,5 +1,6 @@
 import { Routes, Route } from 'react-router-dom'
 import Navbar from './components/Navbar'
+import PrivateRoute from './components/PrivateRoute'
 import Home from './pages/Home'
 import Chat from './pages/Chat'
 import StudyModules from './pages/StudyModules'
@@ -18,11 +19,11 @@ export default function App() {
       <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Routes>
           <Route path="/"              element={<Home />} />
-          <Route path="/chat"          element={<Chat />} />
-          <Route path="/study"         element={<StudyModules />} />
-          <Route path="/mock-exam"     element={<MockExam />} />
-          <Route path="/tutorials"     element={<Tutorials />} />
-          <Route path="/tutorials/:id" element={<ModuleDetail />} />
+          <Route path="/chat"          element={<PrivateRoute><Chat /></PrivateRoute>} />
+          <Route path="/study"         element={<PrivateRoute><StudyModules /></PrivateRoute>} />
+          <Route path="/mock-exam"     element={<PrivateRoute><MockExam /></PrivateRoute>} />
+          <Route path="/tutorials"     element={<PrivateRoute><Tutorials /></PrivateRoute>} />
+          <Route path="/tutorials/:id" element={<PrivateRoute><ModuleDetail /></PrivateRoute>} />
           <Route path="/admin"         element={<Admin />} />
           <Route path="/admin/login"   element={<AdminLogin />} />
           <Route path="/login"         element={<Login />} />

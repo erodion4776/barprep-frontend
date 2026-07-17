@@ -1,14 +1,19 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { createClient } from '@supabase/supabase-js'
-import { apiClient } from '../api/client'
+import { apiClient, supabase } from '../api/client'
 import LoadingSpinner from '../components/LoadingSpinner'
 import ReactMarkdown from 'react-markdown'
 
-const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_ANON_KEY
-)
+// The DB stores the full YouTube URL in `video_url` (see Admin.jsx),
+// not a bare `video_id`. Extract the embeddable video ID from any
+// common YouTube URL shape (watch?v=, youtu.be/, embed/, shorts/).
+function extractYouTubeId(url) {
+  if (!url) return null
+  const match = url.match(
+    /(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/
+  )
+  return match ? match[1] : null
+}
 
 export default function ModuleDetail() {
   const { id }                      = useParams()
@@ -151,17 +156,28 @@ I can help you understand the concepts covered, answer questions about the mater
         <div className="lg:col-span-2 space-y-5">
 
           {/* Video Player */}
-          {module.video_id && (
-            <div className="rounded-xl overflow-hidden shadow-md
-                            bg-black aspect-video">
-              <iframe
-                src={`https://www.youtube.com/embed/${module.video_id}`}
-                title={module.title}
-                className="w-full h-full"
-                allow="accelerometer; autoplay; clipboard-write;
-                       encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-              />
+          {(() => {
+            const youtubeId = extractYouTubeId(module.video_url)
+            if (!youtubeId) return null
+            return (
+              <div className="rounded-xl overflow-hidden shadow-md
+                              bg-black aspect-video">
+                <iframe
+                  src={`https://www.youtube.com/embed/${youtubeId}`}
+                  title={module.title}
+                  className="w-full h-full"
+                  allow="accelerometer; autoplay; clipboard-write;
+                         encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                />
+              </div>
+            )
+          })()}
+          {!extractYouTubeId(module.video_url) && (
+            <div className="rounded-xl border border-dashed border-slate-300
+                            bg-slate-50 aspect-video flex items-center
+                            justify-center text-slate-400 text-sm">
+              No video available for this tutorial
             </div>
           )}
 

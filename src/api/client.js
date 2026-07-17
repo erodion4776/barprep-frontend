@@ -15,8 +15,8 @@ const api = axios.create({
   headers: {
     'Content-Type':  'application/json',
     'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-    'apikey':        SUPABASE_ANON_KEY
-  }
+    'apikey':        SUPABASE_ANON_KEY,
+  },
 })
 
 // Render Backend for video processing
@@ -24,8 +24,8 @@ const backendApi = axios.create({
   baseURL: BACKEND_URL,
   timeout: 120000,
   headers: {
-    'Content-Type': 'application/json'
-  }
+    'Content-Type': 'application/json',
+  },
 })
 
 api.interceptors.request.use((config) => {
@@ -85,8 +85,14 @@ export const apiClient = {
   generateQuestion: (topic) =>
     api.post('/mock-exam', { action: 'generate', topic }),
 
-  evaluateAnswer: (question, answer) =>
-    api.post('/mock-exam', { action: 'evaluate', question, answer }),
+  evaluateAnswer: (question, answer, correct_letter, rationale = '') =>
+    api.post('/mock-exam', {
+      action: 'evaluate',
+      question,
+      answer,
+      correct_letter,
+      rationale,
+    }),
 
   getModules: (topic = '', all = false) =>
     api.get(`/get-modules?topic=${encodeURIComponent(topic)}&all=${all}`),

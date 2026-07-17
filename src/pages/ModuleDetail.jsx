@@ -39,7 +39,10 @@ export default function ModuleDetail() {
         .eq('id', id)
         .single()
 
+      console.log('Fetch result:', { data, dbError, id })
+
       if (dbError) throw new Error(dbError.message)
+      console.log('Fetched module:', data)
       setModule(data)
 
       // Set initial AI greeting
@@ -50,7 +53,8 @@ export default function ModuleDetail() {
 I can help you understand the concepts covered, answer questions about the material, and quiz you on key points. What would you like to know?`
       }])
     } catch (err) {
-      setError('Failed to load this tutorial.')
+      console.error('Error loading module:', err)
+      setError(`Failed to load this tutorial: ${err.message || 'Unknown error'}`)
     } finally {
       setLoading(false)
     }

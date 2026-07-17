@@ -55,6 +55,7 @@ export default function Navbar() {
   const handleSignOut = async () => {
     await supabase.auth.signOut()
     setMenuOpen(false)
+    window.location.reload()
   }
 
   return (

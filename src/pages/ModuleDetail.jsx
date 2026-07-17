@@ -37,11 +37,13 @@ export default function ModuleDetail() {
         .from('course_modules')
         .select('*')
         .eq('id', id)
-        .single()
+        .maybeSingle()
 
       console.log('Fetch result:', { data, dbError, id })
 
       if (dbError) throw new Error(dbError.message)
+      if (!data) throw new Error('Module not found')
+      
       console.log('Fetched module:', data)
       setModule(data)
 

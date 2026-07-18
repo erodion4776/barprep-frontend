@@ -644,7 +644,7 @@ export default function Admin() {
                     </p>
                   </div>
                   {module.video_url && (
-                    
+                    <a
                       href={module.video_url}
                       target="_blank"
                       rel="noopener noreferrer"

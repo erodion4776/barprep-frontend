@@ -1,0 +1,4 @@
+public/
+  ├── favicon.svg          ← NEW (blue square with white B)
+  ├── site.webmanifest     ← NEW (PWA manifest)
+  └── (any other files)

@@ -3,6 +3,7 @@ import Navbar from './components/Navbar'
 import Footer from './components/Footer'
 import CookieBanner from './components/CookieBanner'
 import PrivateRoute from './components/PrivateRoute'
+import LandingPage from './pages/LandingPage'
 import Home from './pages/Home'
 import Chat from './pages/Chat'
 import StudyModules from './pages/StudyModules'
@@ -21,6 +22,13 @@ import FAQ from './pages/FAQ'
 import Contact from './pages/Contact'
 import About from './pages/About'
 
+// ── Wrapper for pages that need padding/max-width ────────────────
+const PageWrapper = ({ children }) => (
+  <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    {children}
+  </div>
+)
+
 export default function App() {
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
@@ -29,83 +37,238 @@ export default function App() {
       <Navbar />
 
       {/* ── Main Content ───────────────────────────────────────── */}
-      <main className="flex-1 max-w-6xl mx-auto w-full
-                       px-4 sm:px-6 lg:px-8 py-8">
+      <main className="flex-1 w-full">
         <Routes>
 
-          {/* ── Public Routes ──────────────────────────────────── */}
-          <Route path="/"         element={<Home />} />
-          <Route path="/login"    element={<Login />} />
-          <Route path="/signup"   element={<Signup />} />
-          <Route path="/about"    element={<About />} />
-          <Route path="/faq"      element={<FAQ />} />
-          <Route path="/contact"  element={<Contact />} />
+          {/* ══════════════════════════════════════════════════════
+              PUBLIC ROUTES
+          ══════════════════════════════════════════════════════ */}
 
-          {/* ── Legal Routes ───────────────────────────────────── */}
-          <Route path="/privacy"    element={<PrivacyPolicy />} />
-          <Route path="/terms"      element={<TermsOfService />} />
-          <Route path="/cookies"    element={<CookiePolicy />} />
-          <Route path="/disclaimer" element={<Disclaimer />} />
+          {/* Landing Page — first thing visitors see */}
+          <Route
+            path="/"
+            element={<LandingPage />}
+          />
 
-          {/* ── Protected Routes (login required) ──────────────── */}
-          <Route path="/chat"
+          {/* Dashboard — home for logged-in users */}
+          <Route
+            path="/dashboard"
             element={
-              <PrivateRoute>
-                <Chat />
-              </PrivateRoute>
-            }
-          />
-          <Route path="/study"
-            element={
-              <PrivateRoute>
-                <StudyModules />
-              </PrivateRoute>
-            }
-          />
-          <Route path="/mock-exam"
-            element={
-              <PrivateRoute>
-                <MockExam />
-              </PrivateRoute>
-            }
-          />
-          <Route path="/tutorials"
-            element={
-              <PrivateRoute>
-                <Tutorials />
-              </PrivateRoute>
-            }
-          />
-          <Route path="/tutorials/:id"
-            element={
-              <PrivateRoute>
-                <ModuleDetail />
-              </PrivateRoute>
+              <PageWrapper>
+                <Home />
+              </PageWrapper>
             }
           />
 
-          {/* ── Admin Routes ───────────────────────────────────── */}
-          <Route path="/admin"       element={<Admin />} />
-          <Route path="/admin/login" element={<AdminLogin />} />
+          {/* ══════════════════════════════════════════════════════
+              AUTH ROUTES
+          ══════════════════════════════════════════════════════ */}
 
-          {/* ── 404 Catch All ──────────────────────────────────── */}
-          <Route path="*"
+          <Route
+            path="/login"
             element={
-              <div className="text-center py-20 space-y-4">
-                <div className="text-6xl">404</div>
-                <h1 className="text-2xl font-bold text-slate-900">
-                  Page Not Found
-                </h1>
-                <p className="text-slate-500 text-sm">
-                  The page you are looking for does not exist.
-                </p>
-                <a href="/"
-                  className="inline-block mt-4 px-6 py-2.5 bg-blue-600
-                             text-white text-sm font-bold rounded-xl
-                             hover:bg-blue-700 transition-colors">
-                  Go Back Home →
-                </a>
-              </div>
+              <PageWrapper>
+                <Login />
+              </PageWrapper>
+            }
+          />
+
+          <Route
+            path="/signup"
+            element={
+              <PageWrapper>
+                <Signup />
+              </PageWrapper>
+            }
+          />
+
+          {/* ══════════════════════════════════════════════════════
+              PROTECTED ROUTES (login required)
+          ══════════════════════════════════════════════════════ */}
+
+          <Route
+            path="/chat"
+            element={
+              <PrivateRoute>
+                <div className="max-w-6xl mx-auto
+                                px-4 sm:px-6 lg:px-8 py-8">
+                  <Chat />
+                </div>
+              </PrivateRoute>
+            }
+          />
+
+          <Route
+            path="/study"
+            element={
+              <PrivateRoute>
+                <PageWrapper>
+                  <StudyModules />
+                </PageWrapper>
+              </PrivateRoute>
+            }
+          />
+
+          <Route
+            path="/mock-exam"
+            element={
+              <PrivateRoute>
+                <PageWrapper>
+                  <MockExam />
+                </PageWrapper>
+              </PrivateRoute>
+            }
+          />
+
+          <Route
+            path="/tutorials"
+            element={
+              <PrivateRoute>
+                <PageWrapper>
+                  <Tutorials />
+                </PageWrapper>
+              </PrivateRoute>
+            }
+          />
+
+          <Route
+            path="/tutorials/:id"
+            element={
+              <PrivateRoute>
+                <PageWrapper>
+                  <ModuleDetail />
+                </PageWrapper>
+              </PrivateRoute>
+            }
+          />
+
+          {/* ══════════════════════════════════════════════════════
+              ADMIN ROUTES
+          ══════════════════════════════════════════════════════ */}
+
+          <Route
+            path="/admin"
+            element={<Admin />}
+          />
+
+          <Route
+            path="/admin/login"
+            element={<AdminLogin />}
+          />
+
+          {/* ══════════════════════════════════════════════════════
+              INFO PAGES
+          ══════════════════════════════════════════════════════ */}
+
+          <Route
+            path="/about"
+            element={
+              <PageWrapper>
+                <About />
+              </PageWrapper>
+            }
+          />
+
+          <Route
+            path="/faq"
+            element={
+              <PageWrapper>
+                <FAQ />
+              </PageWrapper>
+            }
+          />
+
+          <Route
+            path="/contact"
+            element={
+              <PageWrapper>
+                <Contact />
+              </PageWrapper>
+            }
+          />
+
+          {/* ══════════════════════════════════════════════════════
+              LEGAL PAGES
+          ══════════════════════════════════════════════════════ */}
+
+          <Route
+            path="/privacy"
+            element={
+              <PageWrapper>
+                <PrivacyPolicy />
+              </PageWrapper>
+            }
+          />
+
+          <Route
+            path="/terms"
+            element={
+              <PageWrapper>
+                <TermsOfService />
+              </PageWrapper>
+            }
+          />
+
+          <Route
+            path="/cookies"
+            element={
+              <PageWrapper>
+                <CookiePolicy />
+              </PageWrapper>
+            }
+          />
+
+          <Route
+            path="/disclaimer"
+            element={
+              <PageWrapper>
+                <Disclaimer />
+              </PageWrapper>
+            }
+          />
+
+          {/* ══════════════════════════════════════════════════════
+              404 — CATCH ALL
+          ══════════════════════════════════════════════════════ */}
+
+          <Route
+            path="*"
+            element={
+              <PageWrapper>
+                <div className="text-center py-20 space-y-6">
+                  <div className="text-8xl font-black text-slate-100
+                                  select-none">
+                    404
+                  </div>
+                  <div className="space-y-2">
+                    <h1 className="text-2xl font-bold text-slate-900">
+                      Page Not Found
+                    </h1>
+                    <p className="text-slate-500 text-sm max-w-md mx-auto">
+                      The page you are looking for does not exist
+                      or has been moved.
+                    </p>
+                  </div>
+                  <div className="flex items-center justify-center
+                                  gap-3 flex-wrap">
+                    <a
+                      href="/"
+                      className="px-6 py-2.5 bg-blue-600 text-white
+                                 text-sm font-bold rounded-xl
+                                 hover:bg-blue-700 transition-colors">
+                      Go Back Home →
+                    </a>
+                    <a
+                      href="/faq"
+                      className="px-6 py-2.5 border border-slate-200
+                                 text-slate-600 text-sm font-bold
+                                 rounded-xl hover:bg-slate-50
+                                 transition-colors">
+                      Visit FAQ
+                    </a>
+                  </div>
+                </div>
+              </PageWrapper>
             }
           />
 

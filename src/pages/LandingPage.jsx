@@ -100,11 +100,10 @@ function FAQItem({ q, a }) {
 
 // ── Main Landing Page ────────────────────────────────────────────
 export default function LandingPage() {
-  const navigate                    = useNavigate()
-  const [user, setUser]             = useState(null)
+  const navigate                        = useNavigate()
+  const [user, setUser]                 = useState(null)
   const [billingCycle, setBillingCycle] = useState('monthly')
-  const [statsRef, statsInView]     = useInView()
-  const [scrollY, setScrollY]       = useState(0)
+  const [statsRef, statsInView]         = useInView()
 
   const typingText = useTypingAnimation([
     'Pass the Bar Exam',
@@ -114,9 +113,9 @@ export default function LandingPage() {
     'Study Smarter',
   ])
 
-  const studentsCount = useCounter(12000, 2500, statsInView)
+  const studentsCount  = useCounter(12000,  2500, statsInView)
   const questionsCount = useCounter(500000, 2500, statsInView)
-  const passRateCount  = useCounter(94, 2000, statsInView)
+  const passRateCount  = useCounter(94,     2000, statsInView)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -128,18 +127,12 @@ export default function LandingPage() {
     return () => subscription?.unsubscribe()
   }, [])
 
-  useEffect(() => {
-    const handleScroll = () => setScrollY(window.scrollY)
-    window.addEventListener('scroll', handleScroll, { passive: true })
-    return () => window.removeEventListener('scroll', handleScroll)
-  }, [])
-
   const handleCTA = () => {
     if (user) navigate('/dashboard')
     else navigate('/login')
   }
 
-  // ── Pricing ──────────────────────────────────────────────────
+  // ── Data ───────────────────────────────────────────────────────
   const plans = [
     {
       name: 'Free',
@@ -148,15 +141,15 @@ export default function LandingPage() {
       color: 'border-slate-200',
       badge: null,
       features: [
-        { text: '10 AI chat messages/day',         included: true  },
-        { text: '5 mock exam questions/day',        included: true  },
-        { text: 'Basic progress tracking',          included: true  },
-        { text: 'Access to tutorials',              included: true  },
-        { text: 'Personalized study plan',          included: false },
-        { text: 'Unlimited mock exams',             included: false },
-        { text: 'Assignment AI analysis',           included: false },
-        { text: 'Advanced analytics',               included: false },
-        { text: 'Priority support',                 included: false },
+        { text: '10 AI chat messages/day',          included: true  },
+        { text: '5 mock exam questions/day',         included: true  },
+        { text: 'Basic progress tracking',           included: true  },
+        { text: 'Access to tutorials',               included: true  },
+        { text: 'Personalized study plan',           included: false },
+        { text: 'Unlimited mock exams',              included: false },
+        { text: 'Assignment AI analysis',            included: false },
+        { text: 'Advanced analytics',                included: false },
+        { text: 'Priority support',                  included: false },
       ],
       cta: 'Get Started Free',
       ctaStyle: 'border-2 border-blue-600 text-blue-600 hover:bg-blue-50',
@@ -168,15 +161,15 @@ export default function LandingPage() {
       color: 'border-blue-600',
       badge: '🔥 Most Popular',
       features: [
-        { text: 'Unlimited AI coaching sessions',   included: true  },
-        { text: 'Unlimited mock exam questions',    included: true  },
-        { text: 'Full progress analytics',          included: true  },
-        { text: 'All video tutorials',              included: true  },
-        { text: 'AI personalized study plan',       included: true  },
-        { text: 'Assignment AI grading & feedback', included: true  },
-        { text: 'Advanced topic diagnostics',       included: true  },
-        { text: 'Priority email support',           included: true  },
-        { text: 'Exam day readiness report',        included: true  },
+        { text: 'Unlimited AI coaching sessions',    included: true  },
+        { text: 'Unlimited mock exam questions',     included: true  },
+        { text: 'Full progress analytics',           included: true  },
+        { text: 'All video tutorials',               included: true  },
+        { text: 'AI personalized study plan',        included: true  },
+        { text: 'Assignment AI grading & feedback',  included: true  },
+        { text: 'Advanced topic diagnostics',        included: true  },
+        { text: 'Priority email support',            included: true  },
+        { text: 'Exam day readiness report',         included: true  },
       ],
       cta: 'Start Pro — $90/mo',
       ctaStyle: 'bg-blue-600 text-white hover:bg-blue-700 shadow-xl shadow-blue-200',
@@ -188,15 +181,15 @@ export default function LandingPage() {
       color: 'border-purple-500',
       badge: '👑 Best Value',
       features: [
-        { text: 'Everything in Pro',                included: true  },
-        { text: '1-on-1 AI tutoring sessions',      included: true  },
-        { text: 'Full MEE essay grading',           included: true  },
-        { text: 'Simulated full bar exam',          included: true  },
-        { text: 'Personalized weakness drills',     included: true  },
-        { text: 'Study group access',               included: true  },
-        { text: 'Flashcard system',                 included: true  },
-        { text: 'Lifetime access to materials',     included: true  },
-        { text: 'Pass guarantee or money back',     included: true  },
+        { text: 'Everything in Pro',                 included: true  },
+        { text: '1-on-1 AI tutoring sessions',       included: true  },
+        { text: 'Full MEE essay grading',            included: true  },
+        { text: 'Simulated full bar exam',           included: true  },
+        { text: 'Personalized weakness drills',      included: true  },
+        { text: 'Study group access',                included: true  },
+        { text: 'Flashcard system',                  included: true  },
+        { text: 'Lifetime access to materials',      included: true  },
+        { text: 'Pass guarantee or money back',      included: true  },
       ],
       cta: 'Go Bar Ready',
       ctaStyle: 'bg-purple-600 text-white hover:bg-purple-700 shadow-xl shadow-purple-200',
@@ -233,7 +226,7 @@ export default function LandingPage() {
       iconBg: 'bg-amber-500',
     },
     {
-      icon: '📝',
+      icon: '✍️',
       title: 'Assignment AI Grader',
       desc: 'Submit essays and legal memos. The AI grades them using bar exam rubrics and gives specific, actionable feedback.',
       color: 'bg-rose-50 border-rose-100',
@@ -332,9 +325,9 @@ export default function LandingPage() {
   return (
     <div className="overflow-x-hidden">
 
-      {/* ══════════════════════════════════════════════════════════
+      {/* ════════════════════════════════════════════════════════════
           HERO SECTION
-      ══════════════════════════════════════════════════════════ */}
+      ════════════════════════════════════════════════════════════ */}
       <section className="relative min-h-screen bg-gradient-to-br
                           from-slate-900 via-blue-950 to-slate-900
                           flex items-center justify-center
@@ -343,36 +336,31 @@ export default function LandingPage() {
         {/* Animated background orbs */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div className="absolute top-1/4 left-1/4 w-96 h-96
-                          bg-blue-600/20 rounded-full blur-3xl
-                          animate-pulse" />
+                          bg-blue-600/20 rounded-full blur-3xl animate-pulse" />
           <div className="absolute bottom-1/4 right-1/4 w-80 h-80
-                          bg-purple-600/20 rounded-full blur-3xl
-                          animate-pulse"
+                          bg-purple-600/20 rounded-full blur-3xl animate-pulse"
                style={{ animationDelay: '1s' }} />
           <div className="absolute top-1/2 left-1/2 w-64 h-64
-                          bg-indigo-600/10 rounded-full blur-3xl
-                          animate-pulse"
+                          bg-indigo-600/10 rounded-full blur-3xl animate-pulse"
                style={{ animationDelay: '2s' }} />
         </div>
 
-        {/* Grid pattern overlay */}
+        {/* Grid pattern */}
         <div className="absolute inset-0 opacity-[0.03]"
              style={{
                backgroundImage: `linear-gradient(#fff 1px, transparent 1px),
                                  linear-gradient(90deg, #fff 1px, transparent 1px)`,
-               backgroundSize: '50px 50px'
+               backgroundSize: '50px 50px',
              }} />
 
-        <div className="relative z-10 max-w-5xl mx-auto text-center
-                        space-y-8">
+        <div className="relative z-10 max-w-5xl mx-auto text-center space-y-8">
 
           {/* Badge */}
           <div className="inline-flex items-center gap-2 px-4 py-2
                           bg-blue-600/20 border border-blue-500/30
                           rounded-full text-blue-300 text-sm font-medium
                           backdrop-blur-sm">
-            <span className="w-2 h-2 bg-blue-400 rounded-full
-                             animate-pulse" />
+            <span className="w-2 h-2 bg-blue-400 rounded-full animate-pulse" />
             AI-Powered Bar Exam Preparation Platform
           </div>
 
@@ -384,8 +372,7 @@ export default function LandingPage() {
               <br />
               <span className="text-transparent bg-clip-text
                                bg-gradient-to-r from-blue-400
-                               via-purple-400 to-blue-400
-                               animate-pulse">
+                               via-purple-400 to-blue-400">
                 {typingText}
                 <span className="text-blue-400 animate-pulse">|</span>
               </span>
@@ -403,7 +390,110 @@ export default function LandingPage() {
                           justify-center gap-4">
             <button
               onClick={handleCTA}
-              className="w-full sm:w-auto px-10 py-4 bg-blue-600 text-white
-                         text-lg font-bold rounded-2xl hover:bg-blue-500
-                         transition-all duration-200 shadow-2xl
-                         
+              className="w-full sm:w-auto px-10 py-4 bg-blue-600
+                         text-white text-lg font-bold rounded-2xl
+                         hover:bg-blue-500 transition-all duration-200
+                         shadow-2xl shadow-blue-900/50
+                         hover:shadow-blue-500/30 hover:-translate-y-0.5
+                         active:scale-[0.98]">
+              Try Now — It's Free →
+            </button>
+            <a href="#pricing"
+              className="w-full sm:w-auto px-10 py-4 border
+                         border-slate-600 text-slate-300 text-lg
+                         font-bold rounded-2xl hover:border-blue-500
+                         hover:text-white transition-all duration-200
+                         text-center">
+              View Pricing
+            </a>
+          </div>
+
+          {/* Trust signals */}
+          <div className="flex items-center justify-center gap-6
+                          flex-wrap text-slate-500 text-xs">
+            {[
+              '✅ No credit card required',
+              '✅ Cancel anytime',
+              '✅ GDPR compliant',
+              '✅ 24/7 AI access',
+            ].map(t => (
+              <span key={t} className="font-medium">{t}</span>
+            ))}
+          </div>
+
+          {/* Floating UI Preview */}
+          <div className="relative mt-8 mx-auto max-w-2xl">
+            <div className="bg-slate-800/80 backdrop-blur-xl border
+                            border-slate-700/50 rounded-2xl p-4
+                            shadow-2xl shadow-black/50 text-left">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-3 h-3 bg-red-500 rounded-full" />
+                <div className="w-3 h-3 bg-amber-500 rounded-full" />
+                <div className="w-3 h-3 bg-green-500 rounded-full" />
+                <span className="ml-2 text-slate-500 text-xs font-mono">
+                  BarPrep AI Coach
+                </span>
+              </div>
+              <div className="space-y-3">
+                <div className="flex justify-end">
+                  <div className="bg-blue-600 text-white text-xs
+                                  px-3 py-2 rounded-xl rounded-br-sm max-w-xs">
+                    Explain the Erie doctrine for the bar exam
+                  </div>
+                </div>
+                <div className="flex justify-start">
+                  <div className="bg-slate-700 text-slate-200 text-xs
+                                  px-3 py-2 rounded-xl rounded-bl-sm max-w-sm">
+                    <p className="font-bold text-blue-400 mb-1">
+                      Erie Railroad Co. v. Tompkins (1938)
+                    </p>
+                    <p>
+                      In diversity cases, federal courts must apply state{' '}
+                      <span className="text-amber-400 font-semibold">
+                        substantive law
+                      </span>{' '}
+                      but federal{' '}
+                      <span className="text-green-400 font-semibold">
+                        procedural law
+                      </span>
+                      . The key test: would applying the rule significantly
+                      affect the outcome? ⚖️
+                    </p>
+                  </div>
+                </div>
+                <div className="flex justify-start">
+                  <div className="bg-slate-700/50 text-slate-400 text-xs
+                                  px-3 py-1.5 rounded-xl animate-pulse">
+                    AI is typing...
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Floating badges */}
+            <div className="absolute -top-4 -right-4 bg-green-500
+                            text-white text-xs font-bold px-3 py-1.5
+                            rounded-full shadow-lg animate-bounce">
+              ✅ Just answered!
+            </div>
+            <div className="absolute -bottom-4 -left-4 bg-blue-600
+                            text-white text-xs font-bold px-3 py-1.5
+                            rounded-full shadow-lg">
+              📊 94% pass rate
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      {/* ════════════════════════════════════════════════════════════
+          STATS SECTION
+      ════════════════════════════════════════════════════════════ */}
+      <section ref={statsRef} className="bg-blue-600 py-16 px-4">
+        <div className="max-w-5xl mx-auto">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-8 text-center">
+            {[
+              {
+                value: `${studentsCount.toLocaleString()}+`,
+                label: 'Students Studying',
+                sub:   

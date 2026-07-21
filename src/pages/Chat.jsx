@@ -1,7 +1,9 @@
 import { useState, useRef, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import { apiClient } from '../api/client'
 import LoadingSpinner from '../components/LoadingSpinner'
 import ReactMarkdown from 'react-markdown'
+import { useProgress } from '../context/ProgressContext'
 
 const GREETING = {
   role: 'assistant',
@@ -20,10 +22,42 @@ export default function Chat() {
   const [activeSessionId, setActiveSessionId] = useState(null)
   const [sessionsLoading, setSessionsLoading] = useState(true)
   const [sidebarOpen, setSidebarOpen]         = useState(false)
+  const [progressInjected, setProgressInjected] = useState(false)
 
   const bottomRef = useRef(null)
+  const { progress, getProgressSummary } = useProgress()
 
   useEffect(() => { loadSessions() }, [])
+
+  // Inject personalized greeting once progress loads
+  useEffect(() => {
+    if (progressInjected) return
+    if (progress.loading) return
+    if (progress.stats.totalAttempts === 0 && progress.watchedModules.length === 0) return
+
+    const { stats, weakTopics, strongTopics, recommendedTopics } = progress
+
+    let personalizedGreeting = `Hello! I'm your BarPrep AI Coach and I've reviewed your study progress.\n\n`
+
+    if (stats.totalAttempts > 0) {
+      personalizedGreeting += `📊 **Your Stats:** ${stats.totalAttempts} questions answered with **${stats.overallAccuracy}% accuracy**.\n\n`
+    }
+    if (strongTopics.length > 0) {
+      personalizedGreeting += `✅ **Strong Areas:** ${strongTopics.slice(0, 3).join(', ')}\n\n`
+    }
+    if (weakTopics.length > 0) {
+      personalizedGreeting += `⚠️ **Needs Work:** ${weakTopics.slice(0, 3).join(', ')}\n\n`
+    }
+    if (recommendedTopics.length > 0) {
+      personalizedGreeting += `🎯 **I recommend we focus on:** ${recommendedTopics.join(', ')}\n\nWhat would you like to work on today?`
+    } else {
+      personalizedGreeting += `What would you like to study today?`
+    }
+
+    setMessages([{ role: 'assistant', content: personalizedGreeting, sources: [] }])
+    setProgressInjected(true)
+  }, [progress.loading, progressInjected])
+
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, loading])
@@ -45,6 +79,7 @@ export default function Chat() {
     setActiveSessionId(null)
     setInput('')
     setSidebarOpen(false)
+    setProgressInjected(false)
   }
 
   const loadSession = async (sessionId) => {
@@ -52,9 +87,9 @@ export default function Chat() {
       const res = await apiClient.getSession(sessionId)
       const session = res.data.session
       if (session?.messages) {
-        // Ensure old messages without a sources field still render cleanly
         setMessages(session.messages.map(m => ({ sources: [], ...m })))
         setActiveSessionId(session.id)
+        setProgressInjected(true)
       }
     } catch (err) {
       console.error('Failed to load session:', err)
@@ -62,13 +97,9 @@ export default function Chat() {
     setSidebarOpen(false)
   }
 
-  // Fire-and-forget so the UI unblocks the moment we get the reply.
   const saveSessionAsync = (updatedMessages, sessionIdOverride) => {
     const firstUserMsg = updatedMessages.find(m => m.role === 'user')
-    const title = firstUserMsg
-      ? firstUserMsg.content.substring(0, 80)
-      : 'New Chat'
-
+    const title = firstUserMsg ? firstUserMsg.content.substring(0, 80) : 'New Chat'
     const currentId = sessionIdOverride ?? activeSessionId
 
     ;(async () => {
@@ -117,7 +148,11 @@ export default function Chat() {
         .slice(-10)
         .map(({ role, content }) => ({ role, content }))
 
-      const res = await apiClient.chat(userMessage, history)
+      // Prepend student progress summary as system context
+      const progressSummary = getProgressSummary()
+      const messageWithContext = `[STUDENT CONTEXT - use this to personalize your response]\n${progressSummary}\n\n[STUDENT QUESTION]\n${userMessage}`
+
+      const res = await apiClient.chat(messageWithContext, history)
       const reply   = res.data.reply || ''
       const sources = Array.isArray(res.data.sources) ? res.data.sources : []
 
@@ -126,7 +161,7 @@ export default function Chat() {
         { role: 'assistant', content: reply, sources },
       ]
       setMessages(finalMessages)
-      saveSessionAsync(finalMessages)   // no await; UI unblocks immediately
+      saveSessionAsync(finalMessages)
     } catch (err) {
       setMessages([
         ...withUser,
@@ -143,11 +178,11 @@ export default function Chat() {
 
   const formatDate = (dateStr) => {
     const date = new Date(dateStr)
-    const now  = new Date()
-    const diff = now.getTime() - date.getTime()
-    const mins = Math.floor(diff / 60000)
-    const hrs  = Math.floor(diff / 3600000)
-    const days = Math.floor(diff / 86400000)
+    const now   = new Date()
+    const diff  = now.getTime() - date.getTime()
+    const mins  = Math.floor(diff / 60000)
+    const hrs   = Math.floor(diff / 3600000)
+    const days  = Math.floor(diff / 86400000)
     if (mins < 1)  return 'Just now'
     if (mins < 60) return `${mins}m ago`
     if (hrs < 24)  return `${hrs}h ago`
@@ -159,6 +194,21 @@ export default function Chat() {
     try { return new URL(url).hostname.replace(/^www\./, '') }
     catch { return url }
   }
+
+  // Smart quick prompts based on weak topics
+  const quickPrompts = progress.weakTopics.length > 0
+    ? [
+        `Explain ${progress.weakTopics[0]} for the bar exam`,
+        `Give me a practice question on ${progress.weakTopics[0]}`,
+        progress.weakTopics[1] ? `What are the key rules in ${progress.weakTopics[1]}?` : 'What topics should I focus on?',
+        'Create a study plan based on my progress',
+      ]
+    : [
+        'Explain the elements of negligence',
+        'What is the Erie doctrine?',
+        'Give me a Contracts hypo',
+        'How does hearsay work in Evidence?',
+      ]
 
   return (
     <div className="flex h-[calc(100vh-8rem)] -mx-4 sm:-mx-6 lg:-mx-8">
@@ -177,12 +227,32 @@ export default function Chat() {
           <button onClick={startNewChat}
             className="w-full flex items-center gap-3 px-3 py-2.5
                        rounded-lg border border-slate-600
-                       hover:bg-slate-800 transition-colors
-                       text-sm font-medium">
-            <span className="text-lg">+</span>
-            New Chat
+                       hover:bg-slate-800 transition-colors text-sm font-medium">
+            <span className="text-lg">+</span> New Chat
           </button>
         </div>
+
+        {/* Progress Summary in Sidebar */}
+        {progress.stats.totalAttempts > 0 && (
+          <div className="px-3 py-3 border-b border-slate-700 space-y-2">
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Your Progress</p>
+            <div className="flex justify-between text-xs text-slate-300">
+              <span>Accuracy</span>
+              <span className="font-bold text-blue-400">{progress.stats.overallAccuracy}%</span>
+            </div>
+            <div className="w-full bg-slate-700 rounded-full h-1.5">
+              <div
+                className="bg-blue-500 h-1.5 rounded-full transition-all"
+                style={{ width: `${progress.stats.overallAccuracy}%` }}
+              />
+            </div>
+            {progress.weakTopics.length > 0 && (
+              <p className="text-[10px] text-amber-400">
+                ⚠️ Focus: {progress.weakTopics[0]}
+              </p>
+            )}
+          </div>
+        )}
 
         <div className="flex-1 overflow-y-auto py-2">
           {sessionsLoading ? (
@@ -205,9 +275,8 @@ export default function Chat() {
                     <p className="text-xs text-slate-500 mt-0.5">{formatDate(session.updated_at)}</p>
                   </div>
                   <button onClick={(e) => deleteSession(session.id, e)}
-                    className="opacity-0 group-hover:opacity-100
-                               text-slate-500 hover:text-red-400
-                               transition-opacity shrink-0 p-1"
+                    className="opacity-0 group-hover:opacity-100 text-slate-500
+                               hover:text-red-400 transition-opacity shrink-0 p-1"
                     title="Delete chat">
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -220,8 +289,21 @@ export default function Chat() {
           )}
         </div>
 
-        <div className="p-3 border-t border-slate-700">
-          <p className="text-xs text-slate-500 text-center">
+        {/* Sidebar Navigation Links */}
+        <div className="p-3 border-t border-slate-700 space-y-1">
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Quick Navigate</p>
+          {[
+            { to: '/mock-exam', label: '📝 Mock Exam'  },
+            { to: '/tutorials', label: '🎥 Tutorials'  },
+            { to: '/study',     label: '📚 Study Modules' },
+          ].map(({ to, label }) => (
+            <Link key={to} to={to}
+              className="block px-3 py-2 rounded-lg text-xs text-slate-400
+                         hover:bg-slate-800 hover:text-white transition-colors">
+              {label}
+            </Link>
+          ))}
+          <p className="text-center text-slate-500 text-xs pt-2">
             {sessions.length} conversation{sessions.length !== 1 ? 's' : ''}
           </p>
         </div>
@@ -234,7 +316,6 @@ export default function Chat() {
 
       {/* ---- Main Chat ---- */}
       <div className="flex-1 flex flex-col min-w-0">
-
         <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 bg-white">
           <div className="flex items-center gap-3">
             <button onClick={() => setSidebarOpen(!sidebarOpen)}
@@ -245,12 +326,28 @@ export default function Chat() {
             </button>
             <div>
               <h1 className="text-lg font-bold text-slate-900">AI Coach</h1>
-              <p className="text-xs text-slate-500">Ask any bar exam question</p>
+              <p className="text-xs text-slate-500">
+                {progress.stats.totalAttempts > 0
+                  ? `${progress.stats.overallAccuracy}% accuracy • ${progress.stats.totalAttempts} questions done`
+                  : 'Ask any bar exam question'}
+              </p>
             </div>
           </div>
-          <button onClick={startNewChat} className="btn-secondary text-xs px-3 py-1.5">
-            + New Chat
-          </button>
+          <div className="flex items-center gap-2">
+            <Link to="/mock-exam"
+              className="hidden sm:block text-xs text-slate-500
+                         hover:text-blue-600 font-medium transition-colors">
+              📝 Mock Exam
+            </Link>
+            <Link to="/tutorials"
+              className="hidden sm:block text-xs text-slate-500
+                         hover:text-blue-600 font-medium transition-colors">
+              🎥 Tutorials
+            </Link>
+            <button onClick={startNewChat} className="btn-secondary text-xs px-3 py-1.5">
+              + New Chat
+            </button>
+          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 min-h-0 bg-slate-50">
@@ -265,25 +362,16 @@ export default function Chat() {
                     <div className="prose prose-sm prose-slate max-w-none">
                       <ReactMarkdown>{msg.content}</ReactMarkdown>
                     </div>
-
                     {msg.sources && msg.sources.length > 0 && (
                       <div className="mt-3 pt-3 border-t border-slate-100">
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
-                          Sources
-                        </p>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Sources</p>
                         <ol className="space-y-1.5">
                           {msg.sources.map((s) => (
                             <li key={s.number} className="text-xs flex gap-2 items-start">
-                              <span className="font-mono font-bold text-slate-400 shrink-0">
-                                [{s.number}]
-                              </span>
-                              <a
-                                href={s.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
+                              <span className="font-mono font-bold text-slate-400 shrink-0">[{s.number}]</span>
+                              <a href={s.url} target="_blank" rel="noopener noreferrer"
                                 className="text-blue-600 hover:text-blue-800 hover:underline break-words"
-                                title={s.snippet}
-                              >
+                                title={s.snippet}>
                                 {s.title}
                                 <span className="text-slate-400 ml-1 font-normal">
                                   ({hostFromUrl(s.url)})
@@ -309,8 +397,22 @@ export default function Chat() {
               </div>
             </div>
           )}
-
           <div ref={bottomRef} />
+        </div>
+
+        {/* Smart Quick Prompts */}
+        <div className="px-4 py-2 bg-white border-t border-slate-100 flex gap-2 overflow-x-auto">
+          {quickPrompts.map((prompt) => (
+            <button key={prompt}
+              onClick={() => setInput(prompt)}
+              className="text-xs bg-slate-50 border border-slate-200
+                         rounded-full px-3 py-1.5 whitespace-nowrap
+                         hover:bg-blue-50 hover:border-blue-300
+                         text-slate-600 hover:text-blue-700
+                         transition-colors shrink-0">
+              {prompt}
+            </button>
+          ))}
         </div>
 
         <form onSubmit={sendMessage}
@@ -319,18 +421,19 @@ export default function Chat() {
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Ask a bar exam question..."
+            placeholder={
+              progress.weakTopics.length > 0
+                ? `Ask about ${progress.weakTopics[0]}...`
+                : 'Ask a bar exam question...'
+            }
             className="input-field flex-1"
             disabled={loading}
           />
-          <button
-            type="submit"
-            disabled={loading || !input.trim()}
+          <button type="submit" disabled={loading || !input.trim()}
             className="btn-primary px-5 shrink-0 min-h-[44px]">
             {loading ? '...' : 'Send'}
           </button>
         </form>
-
       </div>
     </div>
   )

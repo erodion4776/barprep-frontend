@@ -1,77 +1,119 @@
-import { useState, useEffect } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { useState, useEffect, useCallback } from 'react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from '../api/client'
 
-const links = [
+const NAV_LINKS = [
   { to: '/',          label: 'Home'      },
   { to: '/chat',      label: 'AI Coach'  },
   { to: '/tutorials', label: 'Tutorials' },
   { to: '/study',     label: 'Study'     },
   { to: '/mock-exam', label: 'Mock Exam' },
+  { to: '/blog',      label: 'Blog'      }, // ← NEW
 ]
 
+// ── Helpers ──────────────────────────────────────────────────────────────────
+function getInitials(email = '') {
+  return email.slice(0, 2).toUpperCase()
+}
+
+async function syncProfile(u) {
+  if (!u) return
+  try {
+    await supabase.from('profiles').upsert({
+      id:         u.id,
+      email:      u.email,
+      created_at: u.created_at || new Date().toISOString(),
+    }, { onConflict: 'id' })
+  } catch (err) {
+    console.warn('Silent profile sync issue:', err)
+  }
+}
+
+// ── Component ─────────────────────────────────────────────────────────────────
 export default function Navbar() {
   const { pathname } = useLocation()
-  const [menuOpen, setMenuOpen] = useState(false)
-  const [user, setUser] = useState(null)
+  const navigate     = useNavigate()
 
-  const syncProfile = async (u) => {
-    if (!u) return
-    try {
-      await supabase.from('profiles').upsert({
-        id: u.id,
-        email: u.email,
-        created_at: u.created_at || new Date().toISOString()
-      }, { onConflict: 'id' })
-    } catch (err) {
-      console.warn('Silent profile sync issue (table/policy might not be ready yet):', err)
-    }
-  }
+  const [menuOpen,   setMenuOpen]   = useState(false)
+  const [user,       setUser]       = useState(null)
+  const [isAdmin,    setIsAdmin]    = useState(false)
+  const [scrolled,   setScrolled]   = useState(false)
+  const [userMenuOpen, setUserMenuOpen] = useState(false)
 
+  // ── Scroll shadow ──────────────────────────────────────────────────────────
   useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      const currentUser = session?.user ?? null
-      setUser(currentUser)
-      if (currentUser) {
-        syncProfile(currentUser)
-      }
-    })
-
-    // Listen to changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      const currentUser = session?.user ?? null
-      setUser(currentUser)
-      if (currentUser) {
-        syncProfile(currentUser)
-      }
-    })
-
-    return () => {
-      subscription?.unsubscribe()
-    }
+    const onScroll = () => setScrolled(window.scrollY > 8)
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
   }, [])
 
-  const handleSignOut = async () => {
-    await supabase.auth.signOut()
+  // ── Close mobile menu on route change ─────────────────────────────────────
+  useEffect(() => {
     setMenuOpen(false)
-    window.location.reload()
-  }
+    setUserMenuOpen(false)
+  }, [pathname])
+
+  // ── Auth state ────────────────────────────────────────────────────────────
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      const u = session?.user ?? null
+      setUser(u)
+      checkAdmin(u)
+      if (u) syncProfile(u)
+    })
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        const u = session?.user ?? null
+        setUser(u)
+        checkAdmin(u)
+        if (u) syncProfile(u)
+      }
+    )
+
+    return () => subscription?.unsubscribe()
+  }, [])
+
+  const checkAdmin = useCallback((u) => {
+    if (!u) { setIsAdmin(false); return }
+    // Check admin via user metadata or a known admin email list
+    const adminFlag = u.user_metadata?.is_admin
+    setIsAdmin(!!adminFlag)
+  }, [])
+
+  // ── Sign out ───────────────────────────────────────────────────────────────
+  const handleSignOut = useCallback(async () => {
+    await supabase.auth.signOut()
+    setUser(null)
+    setIsAdmin(false)
+    setMenuOpen(false)
+    setUserMenuOpen(false)
+    navigate('/')
+  }, [navigate])
+
+  // ── Active check ───────────────────────────────────────────────────────────
+  const isActive = (to) =>
+    to === '/' ? pathname === '/' : pathname.startsWith(to)
 
   return (
-    <nav className="bg-white border-b border-slate-200
-                    sticky top-0 z-50">
+    <nav
+      className={`
+        bg-white sticky top-0 z-50 border-b border-slate-200
+        transition-shadow duration-200
+        ${scrolled ? 'shadow-md' : 'shadow-none'}
+      `}
+    >
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
 
-          {/* Logo */}
+          {/* ── Logo ── */}
           <Link
             to="/"
-            className="flex items-center gap-2"
+            className="flex items-center gap-2 shrink-0"
             onClick={() => setMenuOpen(false)}
           >
             <div className="w-8 h-8 bg-blue-600 rounded-lg
-                            flex items-center justify-center shrink-0">
+                            flex items-center justify-center">
               <span className="text-white font-bold text-sm">B</span>
             </div>
             <span className="font-bold text-slate-900 text-lg">
@@ -79,107 +121,245 @@ export default function Navbar() {
             </span>
           </Link>
 
-          {/* Desktop Links */}
+          {/* ── Desktop Links ── */}
           <div className="hidden sm:flex items-center gap-1">
-            {links.map(({ to, label }) => (
+            {NAV_LINKS.map(({ to, label }) => (
               <Link
                 key={to}
                 to={to}
-                className={`px-4 py-2 rounded-lg text-sm font-medium
+                className={`
+                  px-3 py-2 rounded-lg text-sm font-medium
                   transition-colors duration-200
-                  ${pathname === to
+                  ${isActive(to)
                     ? 'bg-blue-50 text-blue-600'
                     : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-                  }`}
+                  }
+                `}
               >
                 {label}
               </Link>
             ))}
+
+            {/* Admin link — only visible to admins */}
+            {isAdmin && (
+              <Link
+                to="/admin"
+                className={`
+                  px-3 py-2 rounded-lg text-sm font-medium
+                  transition-colors duration-200
+                  ${isActive('/admin')
+                    ? 'bg-amber-50 text-amber-600'
+                    : 'text-amber-600 hover:bg-amber-50'
+                  }
+                `}
+              >
+                ⚙ Admin
+              </Link>
+            )}
+
             <div className="h-6 w-px bg-slate-200 mx-2" />
+
+            {/* ── Auth Block ── */}
             {user ? (
-              <div className="flex items-center gap-3">
-                <span className="text-sm font-medium text-slate-600 max-w-[150px] truncate" title={user.email}>
-                  {user.email}
-                </span>
+              <div className="relative">
+                {/* Avatar button */}
                 <button
-                  onClick={handleSignOut}
-                  className="btn-secondary text-sm !py-1.5"
+                  onClick={() => setUserMenuOpen(o => !o)}
+                  className="flex items-center gap-2 pl-1 pr-3 py-1
+                             rounded-full border border-slate-200
+                             hover:border-slate-300 hover:bg-slate-50
+                             transition-all duration-200"
                 >
-                  Sign Out
+                  <div className="w-7 h-7 bg-blue-600 rounded-full
+                                  flex items-center justify-center">
+                    <span className="text-white text-xs font-bold">
+                      {getInitials(user.email)}
+                    </span>
+                  </div>
+                  <span className="text-sm text-slate-600 max-w-[120px] truncate">
+                    {user.email}
+                  </span>
+                  <span className="text-slate-400 text-xs">▾</span>
                 </button>
+
+                {/* Dropdown */}
+                {userMenuOpen && (
+                  <div className="absolute right-0 top-full mt-2 w-56
+                                  bg-white border border-slate-200 rounded-xl
+                                  shadow-lg py-1 z-50">
+                    <div className="px-4 py-2 border-b border-slate-100">
+                      <p className="text-xs text-slate-400">Signed in as</p>
+                      <p className="text-sm font-medium text-slate-700 truncate">
+                        {user.email}
+                      </p>
+                    </div>
+                    <Link
+                      to="/settings"
+                      className="block px-4 py-2 text-sm text-slate-600
+                                 hover:bg-slate-50 transition-colors"
+                    >
+                      ⚙ Settings
+                    </Link>
+                    <Link
+                      to="/chat"
+                      className="block px-4 py-2 text-sm text-slate-600
+                                 hover:bg-slate-50 transition-colors"
+                    >
+                      💬 My Sessions
+                    </Link>
+                    <div className="border-t border-slate-100 mt-1" />
+                    <button
+                      onClick={handleSignOut}
+                      className="w-full text-left px-4 py-2 text-sm
+                                 text-red-600 hover:bg-red-50
+                                 transition-colors"
+                    >
+                      → Sign Out
+                    </button>
+                  </div>
+                )}
               </div>
             ) : (
-              <>
-                <Link to="/login" className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-900">Login</Link>
-                <Link to="/signup" className="btn-primary">Sign up</Link>
-              </>
+              <div className="flex items-center gap-2">
+                <Link
+                  to="/login"
+                  className="px-4 py-2 text-sm font-medium
+                             text-slate-600 hover:text-slate-900
+                             transition-colors"
+                >
+                  Login
+                </Link>
+                <Link
+                  to="/signup"
+                  className="px-4 py-2 text-sm font-bold bg-blue-600
+                             text-white rounded-lg hover:bg-blue-700
+                             transition-colors"
+                >
+                  Sign up free
+                </Link>
+              </div>
             )}
           </div>
 
-          {/* Mobile Hamburger */}
+          {/* ── Mobile Hamburger ── */}
           <button
             className="sm:hidden p-2 rounded-lg text-slate-600
                        hover:bg-slate-100 transition-colors"
-            onClick={() => setMenuOpen(!menuOpen)}
+            onClick={() => setMenuOpen(o => !o)}
             aria-label="Toggle menu"
+            aria-expanded={menuOpen}
           >
-            {menuOpen ? (
-              <svg className="w-6 h-6" fill="none"
-                   stroke="currentColor" viewBox="0 0 24 24">
+            <svg
+              className="w-6 h-6 transition-transform duration-200"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              {menuOpen ? (
                 <path strokeLinecap="round" strokeLinejoin="round"
                       strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            ) : (
-              <svg className="w-6 h-6" fill="none"
-                   stroke="currentColor" viewBox="0 0 24 24">
+              ) : (
                 <path strokeLinecap="round" strokeLinejoin="round"
                       strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-              </svg>
-            )}
+              )}
+            </svg>
           </button>
-
         </div>
       </div>
 
-      {/* Mobile Menu */}
-      {menuOpen && (
-        <div className="sm:hidden border-t border-slate-100
-                        bg-white px-4 py-3 space-y-1">
-          {links.map(({ to, label }) => (
+      {/* ── Mobile Menu ── */}
+      <div
+        className={`
+          sm:hidden border-t border-slate-100 bg-white
+          overflow-hidden transition-all duration-300 ease-in-out
+          ${menuOpen ? 'max-h-[600px] opacity-100' : 'max-h-0 opacity-0'}
+        `}
+      >
+        <div className="px-4 py-3 space-y-1">
+          {NAV_LINKS.map(({ to, label }) => (
             <Link
               key={to}
               to={to}
-              onClick={() => setMenuOpen(false)}
-              className={`block px-4 py-3 rounded-lg text-sm
-                font-medium transition-colors duration-200
-                ${pathname === to
+              className={`
+                block px-4 py-3 rounded-lg text-sm font-medium
+                transition-colors duration-200
+                ${isActive(to)
                   ? 'bg-blue-50 text-blue-600'
                   : 'text-slate-600 hover:bg-slate-100'
-                }`}
+                }
+              `}
             >
               {label}
             </Link>
           ))}
+
+          {isAdmin && (
+            <Link
+              to="/admin"
+              className="block px-4 py-3 rounded-lg text-sm
+                         font-medium text-amber-600 hover:bg-amber-50
+                         transition-colors"
+            >
+              ⚙ Admin
+            </Link>
+          )}
+
+          {/* Mobile auth */}
           {user ? (
             <div className="border-t border-slate-100 pt-3 mt-2 space-y-1">
-              <div className="px-4 py-2 text-xs font-semibold text-slate-400 truncate">
-                {user.email}
+              {/* Avatar row */}
+              <div className="flex items-center gap-3 px-4 py-2">
+                <div className="w-8 h-8 bg-blue-600 rounded-full
+                                flex items-center justify-center shrink-0">
+                  <span className="text-white text-xs font-bold">
+                    {getInitials(user.email)}
+                  </span>
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs text-slate-400">Signed in as</p>
+                  <p className="text-sm font-medium text-slate-700 truncate">
+                    {user.email}
+                  </p>
+                </div>
               </div>
+              <Link
+                to="/settings"
+                className="block px-4 py-3 text-sm text-slate-600
+                           hover:bg-slate-100 rounded-lg transition-colors"
+              >
+                ⚙ Settings
+              </Link>
               <button
                 onClick={handleSignOut}
-                className="w-full text-left block px-4 py-3 text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                className="w-full text-left px-4 py-3 text-sm
+                           font-medium text-red-600 hover:bg-red-50
+                           rounded-lg transition-colors"
               >
-                Sign Out
+                → Sign Out
               </button>
             </div>
           ) : (
             <div className="border-t border-slate-100 pt-2 mt-2 space-y-1">
-              <Link to="/login" onClick={() => setMenuOpen(false)} className="block px-4 py-3 text-sm font-medium text-slate-600 hover:bg-slate-100">Login</Link>
-              <Link to="/signup" onClick={() => setMenuOpen(false)} className="block px-4 py-3 text-sm font-medium text-blue-600 hover:bg-blue-50">Sign up</Link>
+              <Link
+                to="/login"
+                className="block px-4 py-3 text-sm font-medium
+                           text-slate-600 hover:bg-slate-100
+                           rounded-lg transition-colors"
+              >
+                Login
+              </Link>
+              <Link
+                to="/signup"
+                className="block px-4 py-3 text-sm font-bold
+                           text-blue-600 hover:bg-blue-50
+                           rounded-lg transition-colors"
+              >
+                Sign up free →
+              </Link>
             </div>
           )}
         </div>
-      )}
+      </div>
     </nav>
   )
 }

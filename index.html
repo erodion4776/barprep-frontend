@@ -5,71 +5,195 @@
     <meta name="viewport"
           content="width=device-width, initial-scale=1.0" />
 
-    <!-- ── Favicon (SVG) ─────────────────────────────────────── -->
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <!-- ── DNS Prefetch & Preconnect ─────────────────────────────
+         These speed up first connections to external services     -->
+    <link rel="preconnect"
+          href="https://fonts.googleapis.com" />
+    <link rel="preconnect"
+          href="https://fonts.gstatic.com" crossorigin />
+    <link rel="dns-prefetch"
+          href="https://fonts.googleapis.com" />
 
-    <!-- ── Fallback favicons for older browsers ──────────────── -->
+    <!-- Replace YOUR_SUPABASE_PROJECT with your actual project ref -->
+    <link rel="preconnect"
+          href="https://YOUR_SUPABASE_PROJECT.supabase.co" />
+    <link rel="dns-prefetch"
+          href="https://YOUR_SUPABASE_PROJECT.supabase.co" />
+
+    <!-- Pollinations AI (blog image generation) -->
+    <link rel="dns-prefetch"
+          href="https://image.pollinations.ai" />
+
+    <!-- ── Google Fonts ──────────────────────────────────────────
+         Load here (not CSS @import) to avoid render blocking      -->
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- ── Favicons ──────────────────────────────────────────────
+         Generate all sizes at: https://realfavicongenerator.net   -->
+    <link rel="icon" type="image/svg+xml"
+          href="/favicon.svg" />
     <link rel="icon" type="image/png" sizes="32x32"
           href="/favicon-32x32.png" />
     <link rel="icon" type="image/png" sizes="16x16"
           href="/favicon-16x16.png" />
-
-    <!-- ── Apple Touch Icon ──────────────────────────────────── -->
     <link rel="apple-touch-icon" sizes="180x180"
           href="/apple-touch-icon.png" />
-
-    <!-- ── Web App Manifest ──────────────────────────────────── -->
     <link rel="manifest" href="/site.webmanifest" />
 
-    <!-- ── Theme Colors ──────────────────────────────────────── -->
+    <!-- ── Theme colors ──────────────────────────────────────── -->
     <meta name="theme-color" content="#2563eb" />
     <meta name="msapplication-TileColor" content="#2563eb" />
 
-    <!-- ── SEO Meta Tags ─────────────────────────────────────── -->
+    <!-- ── Primary SEO ───────────────────────────────────────── -->
+    <title>BarPrep AI — Pass the Bar Exam with AI</title>
     <meta name="description"
-          content="BarPrep AI — Your personal AI-powered bar exam
-                   coach. Study smarter, practice harder, and pass
-                   the bar exam with confidence. AI coaching, mock
-                   exams, personalized study plans, and more." />
+          content="BarPrep AI — Your personal AI-powered bar exam coach. Study smarter with mock exams, personalized study plans, assignment grading, video tutorials, and a daily bar prep blog. Available 24/7." />
     <meta name="keywords"
-          content="bar exam prep, AI bar exam coach, MBE practice
-                   questions, bar study plan, law exam preparation,
-                   pass the bar, bar exam AI, legal study tool,
-                   mock bar exam, bar exam tutor" />
-    <meta name="robots" content="index, follow" />
-    <meta name="author" content="BarPrep AI" />
+          content="bar exam prep, AI bar exam coach, MBE practice questions, bar study plan, law exam preparation, pass the bar, bar exam AI, legal study tool, mock bar exam, bar exam tutor, bar prep blog" />
+    <meta name="robots"   content="index, follow" />
+    <meta name="author"   content="BarPrep AI" />
+    <meta name="language" content="English" />
 
-    <!-- ── Open Graph (Facebook, LinkedIn, etc.) ─────────────── -->
-    <meta property="og:type"        content="website" />
-    <meta property="og:url"         content="https://yoursite.com" />
+    <!-- ── Canonical URL ─────────────────────────────────────────
+         Update to your real production domain                     -->
+    <link rel="canonical"
+          href="https://barprepai.com" />
+
+    <!-- ── Open Graph ────────────────────────────────────────────
+         Used by Facebook, LinkedIn, WhatsApp, Slack, etc.
+         og:image should be 1200×630px hosted at a stable URL      -->
+    <meta property="og:type"         content="website" />
+    <meta property="og:url"          content="https://barprepai.com" />
+    <meta property="og:site_name"    content="BarPrep AI" />
+    <meta property="og:locale"       content="en_US" />
     <meta property="og:title"
           content="BarPrep AI — Pass the Bar Exam with AI" />
     <meta property="og:description"
-          content="Your personal AI-powered bar exam coach.
-                   Study smarter with mock exams, personalized
-                   study plans, and AI assignment grading." />
+          content="Your personal AI-powered bar exam coach. Study smarter with mock exams, personalized study plans, and AI coaching available 24/7." />
     <meta property="og:image"
-          content="https://yoursite.com/og-image.png" />
-    <meta property="og:site_name"   content="BarPrep AI" />
-    <meta property="og:locale"      content="en_US" />
+          content="https://barprepai.com/og-image.png" />
+    <meta property="og:image:width"  content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt"
+          content="BarPrep AI — AI-Powered Bar Exam Preparation" />
 
     <!-- ── Twitter Card ──────────────────────────────────────── -->
     <meta name="twitter:card"
           content="summary_large_image" />
+    <meta name="twitter:site"
+          content="@barprepai" />
+    <meta name="twitter:creator"
+          content="@barprepai" />
     <meta name="twitter:title"
           content="BarPrep AI — Pass the Bar Exam with AI" />
     <meta name="twitter:description"
-          content="AI-powered bar exam preparation. Mock exams,
-                   study plans, and AI coaching — available 24/7." />
+          content="AI-powered bar exam preparation. Mock exams, study plans, and AI coaching — available 24/7." />
     <meta name="twitter:image"
-          content="https://yoursite.com/og-image.png" />
+          content="https://barprepai.com/og-image.png" />
+    <meta name="twitter:image:alt"
+          content="BarPrep AI — AI-Powered Bar Exam Preparation" />
 
-    <!-- ── Page Title ────────────────────────────────────────── -->
-    <title>BarPrep AI — Pass the Bar Exam with AI</title>
+    <!-- ── Structured Data / JSON-LD ─────────────────────────────
+         Helps Google understand this is an educational web app    -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "BarPrep AI",
+      "url": "https://barprepai.com",
+      "description": "AI-powered bar exam preparation platform offering mock exams, personalized study plans, AI coaching, video tutorials, and a daily bar prep blog.",
+      "applicationCategory": "EducationApplication",
+      "operatingSystem": "Web Browser",
+      "offers": [
+        {
+          "@type": "Offer",
+          "name": "Free Plan",
+          "price": "0",
+          "priceCurrency": "USD"
+        },
+        {
+          "@type": "Offer",
+          "name": "Pro Plan",
+          "price": "90",
+          "priceCurrency": "USD",
+          "billingIncrement": "P1M"
+        }
+      ],
+      "publisher": {
+        "@type": "Organization",
+        "name": "BarPrep AI",
+        "url": "https://barprepai.com"
+      },
+      "educationalUse": "Bar Exam Preparation",
+      "audience": {
+        "@type": "EducationalAudience",
+        "educationalRole": "student"
+      }
+    }
+    </script>
+
+    <!-- ── Blog Article Schema ────────────────────────────────────
+         NOTE: For individual blog posts (/blog/:slug), you need
+         dynamic meta tags. Options:
+         1. SSR with Next.js (best for SEO)
+         2. Prerendering with vite-plugin-prerender
+         3. Use react-helmet-async to update tags per page
+         The static tags above cover the home page only.          -->
 
   </head>
+
   <body class="bg-slate-50">
+
+    <!-- ── No-script fallback ──────────────────────────────────── -->
+    <noscript>
+      <div style="
+        font-family: system-ui, sans-serif;
+        max-width: 600px;
+        margin: 100px auto;
+        padding: 24px;
+        text-align: center;
+        background: white;
+        border-radius: 16px;
+        border: 1px solid #e2e8f0;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      ">
+        <div style="font-size: 48px; margin-bottom: 16px;">⚠️</div>
+        <h1 style="font-size: 20px; font-weight: bold; color: #0f172a; margin-bottom: 8px;">
+          JavaScript Required
+        </h1>
+        <p style="color: #64748b; font-size: 14px; line-height: 1.6;">
+          BarPrep AI requires JavaScript to run.
+          Please enable JavaScript in your browser settings to continue.
+        </p>
+        <a
+          href="https://www.enable-javascript.com/"
+          target="_blank"
+          rel="noopener noreferrer"
+          style="
+            display: inline-block;
+            margin-top: 16px;
+            padding: 10px 20px;
+            background: #2563eb;
+            color: white;
+            text-decoration: none;
+            border-radius: 10px;
+            font-weight: bold;
+            font-size: 13px;
+          "
+        >
+          How to Enable JavaScript →
+        </a>
+      </div>
+    </noscript>
+
+    <!-- ── React Root ─────────────────────────────────────────── -->
     <div id="root"></div>
+
+    <!-- ── Entry Script ───────────────────────────────────────── -->
     <script type="module" src="/src/main.jsx"></script>
+
   </body>
 </html>

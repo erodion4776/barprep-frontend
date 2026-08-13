@@ -1,35 +1,34 @@
-// postcss.config.js
 const isProd = process.env.NODE_ENV === 'production'
 
 export default {
   plugins: {
-    // ── Required: process @import statements ──────────────────
-    // Allows splitting CSS across multiple files
+    // Process @import statements
     'postcss-import': {},
 
-    // ── Required: Tailwind CSS ────────────────────────────────
+    // Tailwind CSS
     tailwindcss: {},
 
-    // ── Required: Add vendor prefixes automatically ───────────
-    // e.g. -webkit-transform, -moz-transition etc.
+    // Vendor prefixes
     autoprefixer: {},
 
-    // ── Production only: Minify CSS output ───────────────────
-    // Reduces file size ~20-30% beyond Tailwind's purge
-    // Disabled in dev to keep HMR fast
-    ...(isProd ? {
-      cssnano: {
-        preset: ['default', {
-          // Keep z-index values (Tailwind uses specific values)
-          zindex:           false,
-          // Keep calc() expressions readable
-          calc:             false,
-          // Merge duplicate selectors
-          mergeLonghand:    true,
-          // Remove comments
-          discardComments:  { removeAll: true },
-        }],
-      },
-    } : {}),
+    // Production CSS minification
+    // Only included if cssnano is installed
+    ...(isProd && (() => {
+      try {
+        require.resolve('cssnano')
+        return {
+          cssnano: {
+            preset: ['default', {
+              zindex:          false,
+              calc:            false,
+              discardComments: { removeAll: true },
+            }],
+          },
+        }
+      } catch {
+        // cssnano not installed - skip silently
+        return {}
+      }
+    })()),
   },
 }

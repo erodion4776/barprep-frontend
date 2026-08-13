@@ -1,67 +1,170 @@
-import { useState, useRef, useEffect } from 'react'
-import { Link } from 'react-router-dom'
-import { apiClient } from '../api/client'
-import LoadingSpinner from '../components/LoadingSpinner'
-import ReactMarkdown from 'react-markdown'
-import { useProgress } from '../context/ProgressContext'
+import { useState, useRef, useEffect, useCallback } from 'react'
+import { Link }                from 'react-router-dom'
+import { apiClient }           from '../api/client'
+import LoadingSpinner          from '../components/LoadingSpinner'
+import ReactMarkdown           from 'react-markdown'
+import { useProgress }         from '../context/ProgressContext'
+
+// ── Constants ─────────────────────────────────────────────────────────────────
+const MAX_INPUT_CHARS = 2000
+const MAX_HISTORY     = 10
+const SESSION_LIMIT   = 30
 
 const GREETING = {
-  role: 'assistant',
-  content:
-    "Hello! I'm your BarPrep AI Coach. I can help you understand " +
-    "legal concepts, answer practice questions, and explain bar " +
-    "exam topics step-by-step. What would you like to study today?",
-  sources: [],
+  role:      'assistant',
+  content:   "Hello! I'm your BarPrep AI Coach. I can help you understand legal concepts, answer practice questions, and explain bar exam topics step-by-step. What would you like to study today?",
+  sources:   [],
+  timestamp: new Date().toISOString(),
+  isGreeting: true,
 }
 
-export default function Chat() {
-  const [messages, setMessages]               = useState([GREETING])
-  const [input, setInput]                     = useState('')
-  const [loading, setLoading]                 = useState(false)
-  const [sessions, setSessions]               = useState([])
-  const [activeSessionId, setActiveSessionId] = useState(null)
-  const [sessionsLoading, setSessionsLoading] = useState(true)
-  const [sidebarOpen, setSidebarOpen]         = useState(false)
-  const [progressInjected, setProgressInjected] = useState(false)
+// ── Typing indicator ───────────────────────────────────────────────────────────
+function TypingIndicator() {
+  return (
+    <div className="flex justify-start">
+      <div className="bg-white border border-slate-200 rounded-xl
+                      rounded-bl-sm px-4 py-3 shadow-sm">
+        <div className="flex items-center gap-1">
+          {[0, 1, 2].map(i => (
+            <div
+              key={i}
+              className="w-2 h-2 bg-slate-400 rounded-full animate-bounce"
+              style={{ animationDelay: `${i * 150}ms` }}
+            />
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
 
-  const bottomRef = useRef(null)
+// ── Copy button ────────────────────────────────────────────────────────────────
+function CopyButton({ text }) {
+  const [copied, setCopied] = useState(false)
+  const handle = async () => {
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {}
+  }
+  return (
+    <button
+      onClick={handle}
+      title="Copy to clipboard"
+      className="text-[10px] text-slate-400 hover:text-slate-600
+                 transition-colors flex items-center gap-1"
+    >
+      {copied ? '✅ Copied' : '📋 Copy'}
+    </button>
+  )
+}
+
+// ── Message timestamp ─────────────────────────────────────────────────────────
+function MessageTime({ timestamp }) {
+  if (!timestamp) return null
+  const d = new Date(timestamp)
+  return (
+    <span className="text-[10px] text-slate-300 mt-1 block text-right">
+      {d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+    </span>
+  )
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function formatDate(dateStr) {
+  const date = new Date(dateStr)
+  const diff  = Date.now() - date.getTime()
+  const mins  = Math.floor(diff / 60000)
+  const hrs   = Math.floor(diff / 3600000)
+  const days  = Math.floor(diff / 86400000)
+  if (mins < 1)  return 'Just now'
+  if (mins < 60) return `${mins}m ago`
+  if (hrs  < 24) return `${hrs}h ago`
+  if (days < 7)  return `${days}d ago`
+  return date.toLocaleDateString()
+}
+
+function hostFromUrl(url) {
+  try { return new URL(url).hostname.replace(/^www\./, '') }
+  catch { return url }
+}
+
+// ── Component ─────────────────────────────────────────────────────────────────
+export default function Chat() {
   const { progress, getProgressSummary } = useProgress()
 
+  const [messages,         setMessages]         = useState([GREETING])
+  const [input,            setInput]            = useState('')
+  const [loading,          setLoading]          = useState(false)
+  const [sessions,         setSessions]         = useState([])
+  const [activeSessionId,  setActiveSessionId]  = useState(null)
+  const [sessionsLoading,  setSessionsLoading]  = useState(true)
+  const [sidebarOpen,      setSidebarOpen]      = useState(false)
+  const [progressInjected, setProgressInjected] = useState(false)
+  const [sessionPage,      setSessionPage]      = useState(0)
+
+  const bottomRef  = useRef(null)
+  const inputRef   = useRef(null)
+  const saveTimer  = useRef(null)
+
+  // ── Load sessions on mount ─────────────────────────────────────────────────
   useEffect(() => { loadSessions() }, [])
 
-  // Inject personalized greeting once progress loads
+  // ── Personalized greeting ──────────────────────────────────────────────────
   useEffect(() => {
-    if (progressInjected) return
-    if (progress.loading) return
-    if (progress.stats.totalAttempts === 0 && progress.watchedModules.length === 0) return
+    if (progressInjected || progress.loading) return
+    if (
+      progress.stats.totalAttempts === 0 &&
+      progress.watchedModules.length === 0
+    ) return
 
     const { stats, weakTopics, strongTopics, recommendedTopics } = progress
-
-    let personalizedGreeting = `Hello! I'm your BarPrep AI Coach and I've reviewed your study progress.\n\n`
+    let msg = `Hello! I'm your BarPrep AI Coach and I've reviewed your study progress.\n\n`
 
     if (stats.totalAttempts > 0) {
-      personalizedGreeting += `📊 **Your Stats:** ${stats.totalAttempts} questions answered with **${stats.overallAccuracy}% accuracy**.\n\n`
+      msg += `📊 **Your Stats:** ${stats.totalAttempts} questions answered with **${stats.overallAccuracy}% accuracy**`
+      if (stats.currentStreak > 0) {
+        msg += ` • 🔥 ${stats.currentStreak}-day streak!`
+      }
+      msg += `\n\n`
     }
     if (strongTopics.length > 0) {
-      personalizedGreeting += `✅ **Strong Areas:** ${strongTopics.slice(0, 3).join(', ')}\n\n`
+      msg += `✅ **Strong:** ${strongTopics.slice(0, 3).join(', ')}\n\n`
     }
     if (weakTopics.length > 0) {
-      personalizedGreeting += `⚠️ **Needs Work:** ${weakTopics.slice(0, 3).join(', ')}\n\n`
+      msg += `⚠️ **Needs Work:** ${weakTopics.slice(0, 3).join(', ')}\n\n`
     }
     if (recommendedTopics.length > 0) {
-      personalizedGreeting += `🎯 **I recommend we focus on:** ${recommendedTopics.join(', ')}\n\nWhat would you like to work on today?`
+      msg += `🎯 **Recommended Focus:** ${recommendedTopics.join(', ')}\n\nWhat would you like to work on?`
     } else {
-      personalizedGreeting += `What would you like to study today?`
+      msg += `What would you like to study today?`
     }
 
-    setMessages([{ role: 'assistant', content: personalizedGreeting, sources: [] }])
+    setMessages([{
+      role:      'assistant',
+      content:   msg,
+      sources:   [],
+      timestamp: new Date().toISOString(),
+      isGreeting: true,
+    }])
     setProgressInjected(true)
-  }, [progress.loading, progressInjected])
+  }, [
+    progress.loading,
+    progress.stats.totalAttempts,
+    progress.stats.overallAccuracy,
+    progress.weakTopics,
+    progress.strongTopics,
+    progress.recommendedTopics,
+    progressInjected,
+  ])
 
+  // ── Auto-scroll ────────────────────────────────────────────────────────────
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, loading])
 
+  // ── Load sessions ──────────────────────────────────────────────────────────
   const loadSessions = async () => {
     setSessionsLoading(true)
     try {
@@ -74,20 +177,27 @@ export default function Chat() {
     }
   }
 
-  const startNewChat = () => {
+  // ── New chat ───────────────────────────────────────────────────────────────
+  const startNewChat = useCallback(() => {
     setMessages([GREETING])
     setActiveSessionId(null)
     setInput('')
     setSidebarOpen(false)
     setProgressInjected(false)
-  }
+    inputRef.current?.focus()
+  }, [])
 
+  // ── Load session ───────────────────────────────────────────────────────────
   const loadSession = async (sessionId) => {
     try {
-      const res = await apiClient.getSession(sessionId)
+      const res     = await apiClient.getSession(sessionId)
       const session = res.data.session
       if (session?.messages) {
-        setMessages(session.messages.map(m => ({ sources: [], ...m })))
+        setMessages(session.messages.map(m => ({
+          sources:   [],
+          timestamp: null,
+          ...m,
+        })))
         setActiveSessionId(session.id)
         setProgressInjected(true)
       }
@@ -97,12 +207,16 @@ export default function Chat() {
     setSidebarOpen(false)
   }
 
-  const saveSessionAsync = (updatedMessages, sessionIdOverride) => {
-    const firstUserMsg = updatedMessages.find(m => m.role === 'user')
-    const title = firstUserMsg ? firstUserMsg.content.substring(0, 80) : 'New Chat'
-    const currentId = sessionIdOverride ?? activeSessionId
+  // ── Save session (debounced) ───────────────────────────────────────────────
+  const saveSession = useCallback((updatedMessages, idOverride) => {
+    if (saveTimer.current) clearTimeout(saveTimer.current)
+    saveTimer.current = setTimeout(async () => {
+      const firstUser = updatedMessages.find(m => m.role === 'user')
+      const title     = firstUser
+        ? firstUser.content.substring(0, 80)
+        : 'New Chat'
+      const currentId = idOverride ?? activeSessionId
 
-    ;(async () => {
       try {
         if (currentId) {
           await apiClient.updateSession(currentId, title, updatedMessages)
@@ -114,9 +228,10 @@ export default function Chat() {
       } catch (err) {
         console.error('Failed to save session:', err)
       }
-    })()
-  }
+    }, 1000) // debounce 1s
+  }, [activeSessionId])
 
+  // ── Delete session ─────────────────────────────────────────────────────────
   const deleteSession = async (sessionId, e) => {
     e.stopPropagation()
     try {
@@ -128,117 +243,137 @@ export default function Chat() {
     }
   }
 
+  // ── Send message ───────────────────────────────────────────────────────────
   const sendMessage = async (e) => {
-    e.preventDefault()
-    if (!input.trim() || loading) return
+    e?.preventDefault()
+    const text = input.trim()
+    if (!text || loading) return
 
-    const userMessage = input.trim()
     setInput('')
     setLoading(true)
 
-    const withUser = [
-      ...messages,
-      { role: 'user', content: userMessage, sources: [] },
-    ]
+    const userMsg = {
+      role:      'user',
+      content:   text,
+      sources:   [],
+      timestamp: new Date().toISOString(),
+    }
+    const withUser = [...messages, userMsg]
     setMessages(withUser)
 
     try {
+      // Build history — exclude greeting, keep last N
       const history = withUser
-        .filter(m => m.role !== 'system')
-        .slice(-10)
+        .filter(m => !m.isGreeting && m.role !== 'system')
+        .slice(-MAX_HISTORY)
         .map(({ role, content }) => ({ role, content }))
 
-      // Prepend student progress summary as system context
-      const progressSummary = getProgressSummary()
-      const messageWithContext = `[STUDENT CONTEXT - use this to personalize your response]\n${progressSummary}\n\n[STUDENT QUESTION]\n${userMessage}`
+      // Prepend progress context to user message
+      const progressSummary  = getProgressSummary()
+      const messageWithCtx   =
+        `[STUDENT CONTEXT]\n${progressSummary}\n\n[QUESTION]\n${text}`
 
-      const res = await apiClient.chat(messageWithContext, history)
-      const reply   = res.data.reply || ''
+      const res     = await apiClient.chat(messageWithCtx, history)
+      const reply   = res.data.reply   || ''
       const sources = Array.isArray(res.data.sources) ? res.data.sources : []
 
-      const finalMessages = [
-        ...withUser,
-        { role: 'assistant', content: reply, sources },
-      ]
-      setMessages(finalMessages)
-      saveSessionAsync(finalMessages)
+      const assistantMsg = {
+        role:      'assistant',
+        content:   reply,
+        sources,
+        timestamp: new Date().toISOString(),
+      }
+      const final = [...withUser, assistantMsg]
+      setMessages(final)
+      saveSession(final)
     } catch (err) {
       setMessages([
         ...withUser,
         {
-          role: 'assistant',
-          content: `I encountered an error: ${err.message}. Please try again.`,
-          sources: [],
+          role:      'assistant',
+          content:   `I encountered an error: ${err.message}. Please try again.`,
+          sources:   [],
+          timestamp: new Date().toISOString(),
         },
       ])
     } finally {
       setLoading(false)
+      inputRef.current?.focus()
     }
   }
 
-  const formatDate = (dateStr) => {
-    const date = new Date(dateStr)
-    const now   = new Date()
-    const diff  = now.getTime() - date.getTime()
-    const mins  = Math.floor(diff / 60000)
-    const hrs   = Math.floor(diff / 3600000)
-    const days  = Math.floor(diff / 86400000)
-    if (mins < 1)  return 'Just now'
-    if (mins < 60) return `${mins}m ago`
-    if (hrs < 24)  return `${hrs}h ago`
-    if (days < 7)  return `${days}d ago`
-    return date.toLocaleDateString()
+  // ── Handle textarea enter ──────────────────────────────────────────────────
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      sendMessage()
+    }
   }
 
-  const hostFromUrl = (url) => {
-    try { return new URL(url).hostname.replace(/^www\./, '') }
-    catch { return url }
-  }
-
-  // Smart quick prompts based on weak topics
+  // ── Quick prompts ──────────────────────────────────────────────────────────
   const quickPrompts = progress.weakTopics.length > 0
     ? [
         `Explain ${progress.weakTopics[0]} for the bar exam`,
-        `Give me a practice question on ${progress.weakTopics[0]}`,
-        progress.weakTopics[1] ? `What are the key rules in ${progress.weakTopics[1]}?` : 'What topics should I focus on?',
-        'Create a study plan based on my progress',
+        `Practice question on ${progress.weakTopics[0]}`,
+        progress.weakTopics[1]
+          ? `Key rules in ${progress.weakTopics[1]}`
+          : 'What should I focus on next?',
+        'Build me a study plan',
       ]
     : [
-        'Explain the elements of negligence',
+        'Elements of negligence?',
         'What is the Erie doctrine?',
         'Give me a Contracts hypo',
-        'How does hearsay work in Evidence?',
+        'How does hearsay work?',
       ]
 
-  return (
-    <div className="flex h-[calc(100vh-8rem)] -mx-4 sm:-mx-6 lg:-mx-8">
+  // ── Paginated sessions ─────────────────────────────────────────────────────
+  const PAGE_SIZE      = 15
+  const pagedSessions  = sessions.slice(0, (sessionPage + 1) * PAGE_SIZE)
+  const hasMoreSessions = sessions.length > pagedSessions.length
 
-      {/* ---- Sidebar ---- */}
+  // ── Show quick prompts only on new chats ───────────────────────────────────
+  const isNewChat = messages.length <= 1 || messages.every(m => m.isGreeting)
+
+  return (
+    <div className="flex h-[calc(100vh-4rem)] -mx-4 sm:-mx-6 lg:-mx-8
+                    overflow-hidden">
+
+      {/* ── Sidebar ── */}
       <div className={`
-        ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-        lg:translate-x-0
         fixed lg:relative inset-y-0 left-0
         w-72 lg:w-64 bg-slate-900 text-white
-        flex flex-col z-40
+        flex flex-col z-40 shrink-0
         transition-transform duration-300 ease-in-out
-        lg:rounded-l-xl overflow-hidden shrink-0
+        lg:translate-x-0
+        ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
       `}>
+        {/* New chat button */}
         <div className="p-3 border-b border-slate-700">
-          <button onClick={startNewChat}
+          <button
+            onClick={startNewChat}
             className="w-full flex items-center gap-3 px-3 py-2.5
                        rounded-lg border border-slate-600
-                       hover:bg-slate-800 transition-colors text-sm font-medium">
-            <span className="text-lg">+</span> New Chat
+                       hover:bg-slate-800 transition-colors
+                       text-sm font-medium"
+          >
+            <span className="text-lg">+</span>
+            New Chat
           </button>
         </div>
 
-        {/* Progress Summary in Sidebar */}
+        {/* Progress mini-card */}
         {progress.stats.totalAttempts > 0 && (
           <div className="px-3 py-3 border-b border-slate-700 space-y-2">
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Your Progress</p>
+            <p className="text-[10px] font-bold text-slate-400
+                          uppercase tracking-wider">
+              Your Progress
+            </p>
             <div className="flex justify-between text-xs text-slate-300">
               <span>Accuracy</span>
-              <span className="font-bold text-blue-400">{progress.stats.overallAccuracy}%</span>
+              <span className="font-bold text-blue-400">
+                {progress.stats.overallAccuracy}%
+              </span>
             </div>
             <div className="w-full bg-slate-700 rounded-full h-1.5">
               <div
@@ -246,60 +381,99 @@ export default function Chat() {
                 style={{ width: `${progress.stats.overallAccuracy}%` }}
               />
             </div>
-            {progress.weakTopics.length > 0 && (
-              <p className="text-[10px] text-amber-400">
-                ⚠️ Focus: {progress.weakTopics[0]}
-              </p>
-            )}
+            <div className="flex items-center justify-between">
+              {progress.stats.currentStreak > 0 && (
+                <p className="text-[10px] text-orange-400">
+                  🔥 {progress.stats.currentStreak}-day streak
+                </p>
+              )}
+              {progress.weakTopics.length > 0 && (
+                <p className="text-[10px] text-amber-400">
+                  ⚠️ {progress.weakTopics[0]}
+                </p>
+              )}
+            </div>
           </div>
         )}
 
+        {/* Session list */}
         <div className="flex-1 overflow-y-auto py-2">
           {sessionsLoading ? (
-            <div className="flex justify-center py-8"><LoadingSpinner size="sm" /></div>
+            <div className="flex justify-center py-8">
+              <LoadingSpinner size="sm" color="white" />
+            </div>
           ) : sessions.length === 0 ? (
             <p className="text-center text-slate-500 text-xs py-8 px-4">
-              No chat history yet. Start a conversation!
+              No history yet. Start a conversation!
             </p>
           ) : (
             <div className="space-y-0.5 px-2">
-              {sessions.map((session) => (
-                <button key={session.id} onClick={() => loadSession(session.id)}
-                  className={`w-full text-left px-3 py-2.5 rounded-lg text-sm
-                    transition-colors duration-150 group flex items-center justify-between gap-2
+              {pagedSessions.map(session => (
+                <button
+                  key={session.id}
+                  onClick={() => loadSession(session.id)}
+                  className={`
+                    w-full text-left px-3 py-2.5 rounded-lg text-sm
+                    transition-colors group flex items-center
+                    justify-between gap-2
                     ${activeSessionId === session.id
                       ? 'bg-slate-700 text-white'
-                      : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}>
+                      : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                    }
+                  `}
+                >
                   <div className="flex-1 min-w-0">
-                    <p className="truncate text-sm">{session.title || 'Untitled Chat'}</p>
-                    <p className="text-xs text-slate-500 mt-0.5">{formatDate(session.updated_at)}</p>
+                    <p className="truncate text-sm">
+                      {session.title || 'Untitled Chat'}
+                    </p>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      {formatDate(session.updated_at)}
+                    </p>
                   </div>
-                  <button onClick={(e) => deleteSession(session.id, e)}
-                    className="opacity-0 group-hover:opacity-100 text-slate-500
-                               hover:text-red-400 transition-opacity shrink-0 p-1"
-                    title="Delete chat">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
+                  <button
+                    onClick={e => deleteSession(session.id, e)}
+                    className="opacity-0 group-hover:opacity-100
+                               text-slate-500 hover:text-red-400
+                               transition-opacity shrink-0 p-1"
+                    title="Delete"
+                  >
+                    🗑
                   </button>
                 </button>
               ))}
+
+              {/* Load more sessions */}
+              {hasMoreSessions && (
+                <button
+                  onClick={() => setSessionPage(p => p + 1)}
+                  className="w-full text-center text-xs text-slate-500
+                             hover:text-slate-300 py-2 transition-colors"
+                >
+                  Load more…
+                </button>
+              )}
             </div>
           )}
         </div>
 
-        {/* Sidebar Navigation Links */}
+        {/* Sidebar nav links */}
         <div className="p-3 border-t border-slate-700 space-y-1">
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Quick Navigate</p>
+          <p className="text-[10px] font-bold text-slate-400 uppercase
+                        tracking-wider mb-2">
+            Quick Navigate
+          </p>
           {[
-            { to: '/mock-exam', label: '📝 Mock Exam'  },
-            { to: '/tutorials', label: '🎥 Tutorials'  },
-            { to: '/study',     label: '📚 Study Modules' },
+            { to: '/mock-exam', label: '📝 Mock Exam'      },
+            { to: '/tutorials', label: '🎥 Tutorials'      },
+            { to: '/study',     label: '📚 Study Modules'  },
+            { to: '/blog',      label: '📰 Blog'           },
           ].map(({ to, label }) => (
-            <Link key={to} to={to}
+            <Link
+              key={to}
+              to={to}
               className="block px-3 py-2 rounded-lg text-xs text-slate-400
-                         hover:bg-slate-800 hover:text-white transition-colors">
+                         hover:bg-slate-800 hover:text-white transition-colors"
+            >
               {label}
             </Link>
           ))}
@@ -309,71 +483,117 @@ export default function Chat() {
         </div>
       </div>
 
+      {/* Sidebar overlay */}
       {sidebarOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-30 lg:hidden"
-             onClick={() => setSidebarOpen(false)} />
+        <div
+          className="fixed inset-0 bg-black/50 z-30 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
       )}
 
-      {/* ---- Main Chat ---- */}
+      {/* ── Main Chat ── */}
       <div className="flex-1 flex flex-col min-w-0">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 bg-white">
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-4 py-3
+                        border-b border-slate-200 bg-white shrink-0">
           <div className="flex items-center gap-3">
-            <button onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="lg:hidden p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 transition-colors">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+            <button
+              onClick={() => setSidebarOpen(s => !s)}
+              className="lg:hidden p-1.5 rounded-lg text-slate-500
+                         hover:bg-slate-100 transition-colors"
+              aria-label="Toggle sidebar"
+            >
+              <svg className="w-5 h-5" fill="none"
+                   stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round"
+                      strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
               </svg>
             </button>
             <div>
-              <h1 className="text-lg font-bold text-slate-900">AI Coach</h1>
+              <h1 className="text-lg font-bold text-slate-900">
+                AI Coach
+              </h1>
               <p className="text-xs text-slate-500">
                 {progress.stats.totalAttempts > 0
                   ? `${progress.stats.overallAccuracy}% accuracy • ${progress.stats.totalAttempts} questions done`
-                  : 'Ask any bar exam question'}
+                  : 'Ask any bar exam question'
+                }
               </p>
             </div>
           </div>
+
           <div className="flex items-center gap-2">
             <Link to="/mock-exam"
-              className="hidden sm:block text-xs text-slate-500
-                         hover:text-blue-600 font-medium transition-colors">
+                  className="hidden sm:block text-xs text-slate-500
+                             hover:text-blue-600 font-medium transition-colors">
               📝 Mock Exam
             </Link>
             <Link to="/tutorials"
-              className="hidden sm:block text-xs text-slate-500
-                         hover:text-blue-600 font-medium transition-colors">
+                  className="hidden sm:block text-xs text-slate-500
+                             hover:text-blue-600 font-medium transition-colors">
               🎥 Tutorials
             </Link>
-            <button onClick={startNewChat} className="btn-secondary text-xs px-3 py-1.5">
-              + New Chat
+            <button
+              onClick={startNewChat}
+              className="px-3 py-1.5 text-xs font-medium border
+                         border-slate-200 rounded-lg hover:bg-slate-50
+                         transition-colors"
+            >
+              + New
             </button>
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 min-h-0 bg-slate-50">
+        {/* Messages */}
+        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4
+                        bg-slate-50 min-h-0">
           {messages.map((msg, i) => (
-            <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-              <div className={`max-w-[85%] rounded-xl px-4 py-3 text-sm
+            <div
+              key={i}
+              className={`flex ${
+                msg.role === 'user' ? 'justify-end' : 'justify-start'
+              }`}
+            >
+              <div className={`
+                max-w-[85%] rounded-xl px-4 py-3 text-sm
                 ${msg.role === 'user'
                   ? 'bg-blue-600 text-white rounded-br-sm'
-                  : 'bg-white border border-slate-200 text-slate-800 rounded-bl-sm shadow-sm'}`}>
+                  : 'bg-white border border-slate-200 text-slate-800 rounded-bl-sm shadow-sm'
+                }
+              `}>
                 {msg.role === 'assistant' ? (
                   <>
+                    {/* Markdown content */}
                     <div className="prose prose-sm prose-slate max-w-none">
                       <ReactMarkdown>{msg.content}</ReactMarkdown>
                     </div>
+
+                    {/* Sources */}
                     {msg.sources && msg.sources.length > 0 && (
                       <div className="mt-3 pt-3 border-t border-slate-100">
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Sources</p>
+                        <p className="text-[10px] font-bold text-slate-400
+                                      uppercase tracking-wider mb-2">
+                          Sources
+                        </p>
                         <ol className="space-y-1.5">
-                          {msg.sources.map((s) => (
-                            <li key={s.number} className="text-xs flex gap-2 items-start">
-                              <span className="font-mono font-bold text-slate-400 shrink-0">[{s.number}]</span>
-                              <a href={s.url} target="_blank" rel="noopener noreferrer"
-                                className="text-blue-600 hover:text-blue-800 hover:underline break-words"
-                                title={s.snippet}>
+                          {msg.sources.map(s => (
+                            <li key={s.number}
+                                className="text-xs flex gap-2 items-start">
+                              <span className="font-mono font-bold
+                                               text-slate-400 shrink-0">
+                                [{s.number}]
+                              </span>
+                              <a
+                                href={s.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-blue-600 hover:text-blue-800
+                                           hover:underline break-words"
+                                title={s.snippet}
+                              >
                                 {s.title}
-                                <span className="text-slate-400 ml-1 font-normal">
+                                <span className="text-slate-400 ml-1">
                                   ({hostFromUrl(s.url)})
                                 </span>
                               </a>
@@ -382,56 +602,120 @@ export default function Chat() {
                         </ol>
                       </div>
                     )}
+
+                    {/* Copy + timestamp */}
+                    <div className="flex items-center justify-between
+                                    mt-2 pt-2 border-t border-slate-50">
+                      <CopyButton text={msg.content} />
+                      {msg.timestamp && (
+                        <span className="text-[10px] text-slate-300">
+                          {new Date(msg.timestamp).toLocaleTimeString([], {
+                            hour:   '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </span>
+                      )}
+                    </div>
                   </>
                 ) : (
-                  <p>{msg.content}</p>
+                  <>
+                    <p className="whitespace-pre-wrap">{msg.content}</p>
+                    {msg.timestamp && (
+                      <span className="text-[10px] text-blue-200 mt-1 block text-right">
+                        {new Date(msg.timestamp).toLocaleTimeString([], {
+                          hour:   '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </span>
+                    )}
+                  </>
                 )}
               </div>
             </div>
           ))}
 
-          {loading && (
-            <div className="flex justify-start">
-              <div className="bg-white border border-slate-200 rounded-xl rounded-bl-sm px-4 py-3 shadow-sm">
-                <LoadingSpinner size="sm" text="Thinking..." />
-              </div>
-            </div>
-          )}
+          {/* Typing indicator */}
+          {loading && <TypingIndicator />}
           <div ref={bottomRef} />
         </div>
 
-        {/* Smart Quick Prompts */}
-        <div className="px-4 py-2 bg-white border-t border-slate-100 flex gap-2 overflow-x-auto">
-          {quickPrompts.map((prompt) => (
-            <button key={prompt}
-              onClick={() => setInput(prompt)}
-              className="text-xs bg-slate-50 border border-slate-200
-                         rounded-full px-3 py-1.5 whitespace-nowrap
-                         hover:bg-blue-50 hover:border-blue-300
-                         text-slate-600 hover:text-blue-700
-                         transition-colors shrink-0">
-              {prompt}
-            </button>
-          ))}
-        </div>
+        {/* Quick prompts — only on new chat */}
+        {isNewChat && !loading && (
+          <div className="px-4 py-2 bg-white border-t border-slate-100
+                          flex gap-2 overflow-x-auto shrink-0">
+            {quickPrompts.map(prompt => (
+              <button
+                key={prompt}
+                onClick={() => {
+                  setInput(prompt)
+                  inputRef.current?.focus()
+                }}
+                className="text-xs bg-slate-50 border border-slate-200
+                           rounded-full px-3 py-1.5 whitespace-nowrap
+                           hover:bg-blue-50 hover:border-blue-300
+                           text-slate-600 hover:text-blue-700
+                           transition-colors shrink-0"
+              >
+                {prompt}
+              </button>
+            ))}
+          </div>
+        )}
 
-        <form onSubmit={sendMessage}
-              className="flex gap-3 px-4 py-3 border-t border-slate-200 bg-white">
-          <input
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder={
-              progress.weakTopics.length > 0
-                ? `Ask about ${progress.weakTopics[0]}...`
-                : 'Ask a bar exam question...'
-            }
-            className="input-field flex-1"
-            disabled={loading}
-          />
-          <button type="submit" disabled={loading || !input.trim()}
-            className="btn-primary px-5 shrink-0 min-h-[44px]">
-            {loading ? '...' : 'Send'}
+        {/* Input form */}
+        <form
+          onSubmit={sendMessage}
+          className="flex gap-3 px-4 py-3 border-t border-slate-200
+                     bg-white shrink-0"
+        >
+          <div className="flex-1 relative">
+            <textarea
+              ref={inputRef}
+              value={input}
+              onChange={e => {
+                if (e.target.value.length <= MAX_INPUT_CHARS) {
+                  setInput(e.target.value)
+                }
+              }}
+              onKeyDown={handleKeyDown}
+              placeholder={
+                progress.weakTopics.length > 0
+                  ? `Ask about ${progress.weakTopics[0]}… (Shift+Enter for new line)`
+                  : 'Ask a bar exam question… (Shift+Enter for new line)'
+              }
+              rows={1}
+              className="w-full border border-slate-200 rounded-xl px-4 py-2.5
+                         text-sm resize-none focus:outline-none
+                         focus:border-blue-500 transition-colors
+                         max-h-32 overflow-y-auto"
+              style={{ fieldSizing: 'content' }}
+              disabled={loading}
+            />
+            {/* Char count */}
+            {input.length > MAX_INPUT_CHARS * 0.8 && (
+              <span className={`absolute bottom-2 right-3 text-[10px]
+                ${input.length >= MAX_INPUT_CHARS
+                  ? 'text-red-500'
+                  : 'text-slate-400'
+                }`}>
+                {input.length}/{MAX_INPUT_CHARS}
+              </span>
+            )}
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading || !input.trim()}
+            className="px-5 py-2.5 bg-blue-600 text-white font-bold
+                       rounded-xl hover:bg-blue-700 transition-colors
+                       disabled:opacity-60 shrink-0 min-h-[44px]
+                       flex items-center gap-1"
+          >
+            {loading ? (
+              <LoadingSpinner size="sm" color="white" />
+            ) : (
+              <>Send <span className="hidden sm:inline">→</span></>
+            )}
           </button>
         </form>
       </div>

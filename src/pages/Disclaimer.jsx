@@ -1,10 +1,20 @@
-import { Link, useEffect } from 'react-router-dom'
+import { useEffect } from 'react'
+import { Link }      from 'react-router-dom'
 
-// ── IMPORTANT: Update manually when disclaimer changes ────────────────────────
 const LAST_UPDATED = 'January 15, 2025'
 
-// ── Sections ──────────────────────────────────────────────────────────────────
 const SECTIONS = [
+  { id: 'ai-content',  label: '1. AI-Generated Content'     },
+  { id: 'no-results',  label: '2. No Guarantee of Results'  },
+  { id: 'not-ncbe',    label: '3. Not Affiliated with NCBE' },
+  { id: 'supplement',  label: '4. Supplement, Not Replace'  },
+  { id: 'accuracy',    label: '5. Content Accuracy'         },
+  { id: 'tech',        label: '6. Technology Limitations'   },
+  { id: 'blog',        label: '7. AI Blog Disclaimer'       },
+  { id: 'liability',   label: '8. Limitation of Liability'  },
+]
+
+const DISCLAIMER_SECTIONS = [
   {
     id:      'ai-content',
     icon:    '🤖',
@@ -15,25 +25,24 @@ const SECTIONS = [
       AI-generated content may contain errors, outdated information, or
       incomplete analysis. Always verify important legal rules and principles
       with official bar preparation materials, law textbooks, and your
-      jurisdiction's official resources. Blog content is written by AI and
-      has not been reviewed by licensed attorneys.`,
+      jurisdiction's official resources.`,
   },
   {
     id:      'no-results',
     icon:    '📊',
     title:   'No Guarantee of Results',
-    content: `Using BarPrep AI does not guarantee that you will pass the
-      bar examination. Bar exam performance depends on many factors
-      including individual effort, preparation quality, and exam conditions.
-      Our platform is designed to supplement your preparation, not replace
-      comprehensive study programs.`,
+    content: `Using BarPrep AI does not guarantee that you will pass the bar
+      examination. Bar exam performance depends on many factors including
+      individual effort, preparation quality, and exam conditions. Our platform
+      is designed to supplement your preparation, not replace comprehensive
+      study programs.`,
   },
   {
     id:      'not-ncbe',
     icon:    '⚖️',
     title:   'Not Affiliated with NCBE',
-    content: `BarPrep AI is not affiliated with, endorsed by, or connected
-      to the National Conference of Bar Examiners (NCBE), any state bar
+    content: `BarPrep AI is not affiliated with, endorsed by, or connected to
+      the National Conference of Bar Examiners (NCBE), any state bar
       association, or any official bar examination authority. The Multistate
       Bar Examination (MBE), Multistate Essay Examination (MEE), and other
       bar exam components are administered by official bodies independent
@@ -43,9 +52,9 @@ const SECTIONS = [
     id:      'supplement',
     icon:    '📚',
     title:   'Supplement, Not Replace',
-    content: `BarPrep AI is intended to supplement — not replace —
-      accredited bar preparation courses, law school education, and official
-      study materials. We strongly recommend using BarPrep AI alongside
+    content: `BarPrep AI is intended to supplement — not replace — accredited
+      bar preparation courses, law school education, and official study
+      materials. We strongly recommend using BarPrep AI alongside
       comprehensive, accredited bar prep programs such as Barbri, Themis,
       or similar courses.`,
   },
@@ -53,54 +62,48 @@ const SECTIONS = [
     id:      'accuracy',
     icon:    '🔄',
     title:   'Content Accuracy & Currency',
-    content: `Laws, rules, and legal standards change over time. While we
-      make reasonable efforts to keep our content current, we cannot
-      guarantee that all information reflects the most recent legal
-      developments. Always check the most current version of applicable
-      laws and rules before relying on any information from this platform.`,
+    content: `Laws, rules, and legal standards change over time. While we make
+      reasonable efforts to keep our content current, we cannot guarantee that
+      all information reflects the most recent legal developments. Always check
+      the most current version of applicable laws and rules before relying on
+      any information from this platform.`,
   },
   {
     id:      'tech',
     icon:    '💻',
     title:   'Technology Limitations',
     content: `As an AI-powered platform, BarPrep AI may experience technical
-      issues, downtime, or errors in AI responses. We are not liable for
-      any interruptions in service or inaccurate AI outputs that may affect
-      your study preparation.`,
+      issues, downtime, or errors in AI responses. We are not liable for any
+      interruptions in service or inaccurate AI outputs that may affect your
+      study preparation.`,
   },
   {
     id:      'blog',
     icon:    '📰',
     title:   'AI Blog Disclaimer',
     content: `Our blog content is generated automatically by artificial
-      intelligence using live bar prep data feeds and Pollinations AI.
-      Blog articles are not written, reviewed, or verified by licensed
-      attorneys or bar preparation professionals. Blog content is for
-      general educational and informational purposes only and should not
-      be relied upon as legal advice or definitive bar exam preparation
-      guidance. Always cross-reference blog content with official sources.`,
+      intelligence using live bar prep data feeds and Pollinations AI. Blog
+      articles are not written, reviewed, or verified by licensed attorneys or
+      bar preparation professionals. Blog content is for general educational
+      and informational purposes only and should not be relied upon as legal
+      advice or definitive bar exam preparation guidance. Always cross-reference
+      blog content with official sources.`,
   },
   {
     id:      'liability',
     icon:    '🛡️',
     title:   'Limitation of Liability',
     content: `To the fullest extent permitted by applicable law, BarPrep AI,
-      its owners, operators, employees, and affiliates shall not be liable
-      for any indirect, incidental, special, consequential, or punitive
-      damages, including but not limited to loss of study time, bar exam
-      failure, or reliance on AI-generated content. Your use of BarPrep AI
-      is entirely at your own risk. In no event shall our total liability
-      to you exceed the amount you paid for the service in the twelve months
-      preceding the claim.`,
+      its owners, operators, employees, and affiliates shall not be liable for
+      any indirect, incidental, special, consequential, or punitive damages,
+      including but not limited to loss of study time, bar exam failure, or
+      reliance on AI-generated content. Your use of BarPrep AI is entirely at
+      your own risk. In no event shall our total liability to you exceed the
+      amount you paid for the service in the twelve months preceding the claim.`,
   },
 ]
 
-const JUMP_LINKS = SECTIONS.map(s => ({ id: s.id, label: s.title }))
-
-// ── Component ─────────────────────────────────────────────────────────────────
 export default function Disclaimer() {
-
-  // SEO
   useEffect(() => {
     document.title = 'Disclaimer — BarPrep AI'
   }, [])
@@ -108,7 +111,6 @@ export default function Disclaimer() {
   return (
     <div className="max-w-3xl mx-auto px-4 py-8 space-y-8">
 
-      {/* ── Header ── */}
       <div className="text-center space-y-2 pb-6 border-b border-slate-200">
         <div className="text-4xl">⚠️</div>
         <h1 className="text-3xl font-black text-slate-900">Disclaimer</h1>
@@ -120,15 +122,13 @@ export default function Disclaimer() {
         </p>
       </div>
 
-      {/* ── Main warning box ── */}
-      <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl
-                      p-6 space-y-3">
+      <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-6 space-y-3">
         <h2 className="text-xl font-black text-amber-900 flex items-center gap-2">
           ⚠️ Educational Tool — Not Legal Advice
         </h2>
         <p className="text-amber-800 text-sm leading-relaxed">
-          BarPrep AI is an <strong>educational study tool</strong> designed
-          to assist individuals preparing for bar examinations. It is{' '}
+          BarPrep AI is an <strong>educational study tool</strong> designed to
+          assist individuals preparing for bar examinations. It is{' '}
           <strong>NOT</strong> a law firm, legal service, or licensed bar
           preparation course. Nothing on this platform — including AI chat
           responses, blog posts, study plans, or mock exam feedback —
@@ -136,14 +136,12 @@ export default function Disclaimer() {
         </p>
       </div>
 
-      {/* ── Jump navigation ── */}
       <nav className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
-        <p className="text-xs font-bold text-slate-500 uppercase
-                      tracking-wider mb-3">
+        <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">
           Jump to Section
         </p>
         <div className="flex flex-wrap gap-2">
-          {JUMP_LINKS.map(({ id, label }) => (
+          {SECTIONS.map(({ id, label }) => (
             <a
               key={id}
               href={`#${id}`}
@@ -157,70 +155,35 @@ export default function Disclaimer() {
         </div>
       </nav>
 
-      {/* ── Sections ── */}
       <div className="space-y-8">
-        {SECTIONS.map(({ id, icon, title, content }) => (
-          <div
-            key={id}
-            id={id}
-            className="scroll-mt-20 space-y-2"
-          >
-            <h2 className="text-base font-bold text-slate-900
-                           flex items-center gap-2">
-              <span>{icon}</span>
-              {title}
+        {DISCLAIMER_SECTIONS.map(({ id, icon, title, content }) => (
+          <div key={id} id={id} className="space-y-2 scroll-mt-20">
+            <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
+              <span>{icon}</span>{title}
             </h2>
-            <p className="text-slate-600 text-sm leading-relaxed">
-              {content}
-            </p>
+            <p className="text-slate-600 text-sm leading-relaxed">{content}</p>
           </div>
         ))}
       </div>
 
-      {/* ── Contact box ── */}
-      <div className="bg-slate-50 border border-slate-200
-                      rounded-xl p-5 space-y-2">
+      <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 space-y-2">
         <h3 className="font-bold text-slate-800">Questions?</h3>
         <p className="text-sm text-slate-600">
-          If you have questions about this disclaimer or our service,
-          please{' '}
-          <Link
-            to="/contact"
-            className="text-blue-600 hover:underline font-medium"
-          >
+          If you have questions about this disclaimer or our service, please{' '}
+          <Link to="/contact" className="text-blue-600 hover:underline font-medium">
             contact us
           </Link>{' '}
           or email{' '}
-          <a
-            href="mailto:legal@barprepai.com"
-            className="text-blue-600 hover:underline"
-          >
+          <a href="mailto:legal@barprepai.com" className="text-blue-600 hover:underline">
             legal@barprepai.com
-          </a>
-          .
+          </a>.
         </p>
       </div>
 
-      {/* ── Footer links ── */}
       <div className="border-t border-slate-200 pt-6 flex flex-wrap gap-4">
-        <Link
-          to="/privacy"
-          className="text-sm text-blue-600 hover:underline font-medium"
-        >
-          Privacy Policy →
-        </Link>
-        <Link
-          to="/terms"
-          className="text-sm text-blue-600 hover:underline font-medium"
-        >
-          Terms of Service →
-        </Link>
-        <Link
-          to="/cookies"
-          className="text-sm text-blue-600 hover:underline font-medium"
-        >
-          Cookie Policy →
-        </Link>
+        <Link to="/privacy"    className="text-sm text-blue-600 hover:underline font-medium">Privacy Policy →</Link>
+        <Link to="/terms"      className="text-sm text-blue-600 hover:underline font-medium">Terms of Service →</Link>
+        <Link to="/cookies"    className="text-sm text-blue-600 hover:underline font-medium">Cookie Policy →</Link>
       </div>
 
     </div>

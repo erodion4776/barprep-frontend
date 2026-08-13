@@ -1,107 +1,225 @@
-import { Link } from 'react-router-dom'
+import { Link, useEffect } from 'react-router-dom'
 
-const Section = ({ title, children }) => (
-  <div className="space-y-3">
-    <h2 className="text-lg font-bold text-slate-900">{title}</h2>
-    <div className="text-slate-600 text-sm leading-relaxed space-y-2">
-      {children}
+// ── IMPORTANT: Update manually when policy changes ────────────────────────────
+const LAST_UPDATED  = 'January 15, 2025'
+const PRIVACY_EMAIL = 'privacy@barprepai.com'
+
+// ── Section component ─────────────────────────────────────────────────────────
+function Section({ id, title, children }) {
+  return (
+    <div id={id} className="space-y-3 scroll-mt-20">
+      <h2 className="text-lg font-bold text-slate-900">{title}</h2>
+      <div className="text-slate-600 text-sm leading-relaxed space-y-2">
+        {children}
+      </div>
     </div>
-  </div>
-)
+  )
+}
 
+// ── Jump links ────────────────────────────────────────────────────────────────
+const SECTIONS = [
+  { id: 'collect',    label: '1. Information We Collect'   },
+  { id: 'use',        label: '2. How We Use It'            },
+  { id: 'ai',         label: '3. AI & Data Processing'     },
+  { id: 'blog',       label: '4. Blog & Scraper Data'      },
+  { id: 'storage',    label: '5. Storage & Security'       },
+  { id: 'cookies',    label: '6. Cookies'                  },
+  { id: 'sharing',    label: '7. Data Sharing'             },
+  { id: 'email',      label: '8. Email & Newsletter'       },
+  { id: 'rights',     label: '9. Your Rights'              },
+  { id: 'children',   label: '10. Children\'s Privacy'     },
+  { id: 'gdpr',       label: '11. GDPR & CCPA'             },
+  { id: 'changes',    label: '12. Policy Changes'          },
+  { id: 'contact',    label: '13. Contact Us'              },
+]
+
+// ── Component ─────────────────────────────────────────────────────────────────
 export default function PrivacyPolicy() {
+
+  // SEO
+  useEffect(() => {
+    document.title = 'Privacy Policy — BarPrep AI'
+  }, [])
+
   return (
     <div className="max-w-3xl mx-auto px-4 py-8 space-y-8">
 
-      {/* Header */}
+      {/* ── Header ── */}
       <div className="text-center space-y-2 pb-6 border-b border-slate-200">
         <div className="text-4xl">🔒</div>
-        <h1 className="text-3xl font-bold text-slate-900">Privacy Policy</h1>
+        <h1 className="text-3xl font-black text-slate-900">Privacy Policy</h1>
         <p className="text-slate-500 text-sm">
-          Last updated: {new Date().toLocaleDateString('en-US', {
-            year: 'numeric', month: 'long', day: 'numeric'
-          })}
+          Last updated: <strong>{LAST_UPDATED}</strong>
         </p>
         <p className="text-slate-500 text-sm max-w-xl mx-auto">
-          At BarPrep AI, we take your privacy seriously.
-          This policy explains what data we collect,
-          how we use it, and your rights.
+          At BarPrep AI, we take your privacy seriously. This policy explains
+          what data we collect, how we use it, and your rights.
         </p>
       </div>
 
-      <div className="space-y-8">
+      {/* ── Jump navigation ── */}
+      <nav className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+        <p className="text-xs font-bold text-slate-500 uppercase
+                      tracking-wider mb-3">
+          Jump to Section
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {SECTIONS.map(({ id, label }) => (
+            <a
+              key={id}
+              href={`#${id}`}
+              className="text-xs text-blue-600 hover:text-blue-800
+                         hover:underline transition-colors px-2 py-1
+                         bg-white border border-slate-200 rounded-lg"
+            >
+              {label}
+            </a>
+          ))}
+        </div>
+      </nav>
 
-        <Section title="1. Information We Collect">
+      {/* ── Sections ── */}
+      <div className="space-y-10">
+
+        {/* 1 */}
+        <Section id="collect" title="1. Information We Collect">
           <p>We collect the following types of information:</p>
           <ul className="list-disc pl-5 space-y-1.5">
             <li>
               <span className="font-semibold text-slate-800">
                 Account Information:
               </span>{' '}
-              Your email address and password (encrypted) when you create an account.
+              Your email address and encrypted password when you create an account.
             </li>
             <li>
               <span className="font-semibold text-slate-800">
                 Study Data:
               </span>{' '}
-              Your exam attempts, scores, chat messages, assignments,
+              Exam attempts, scores, chat messages, assignments, watched modules,
               and study plan preferences.
             </li>
             <li>
               <span className="font-semibold text-slate-800">
                 Usage Data:
               </span>{' '}
-              Pages visited, features used, and time spent in the app
-              to help us improve the service.
+              Pages visited, features used, and time spent in the app to
+              help us improve the service.
             </li>
             <li>
               <span className="font-semibold text-slate-800">
                 Device Information:
               </span>{' '}
-              Browser type, operating system, and IP address for security purposes.
+              Browser type, operating system, and IP address for security.
+            </li>
+            <li>
+              <span className="font-semibold text-slate-800">
+                Newsletter Email:
+              </span>{' '}
+              If you subscribe to our newsletter, we store your email address
+              for sending study tips and updates.
             </li>
           </ul>
         </Section>
 
-        <Section title="2. How We Use Your Information">
+        {/* 2 */}
+        <Section id="use" title="2. How We Use Your Information">
           <ul className="list-disc pl-5 space-y-1.5">
             <li>To provide and personalize your bar exam preparation experience</li>
             <li>To power AI recommendations based on your progress and weak topics</li>
-            <li>To analyze your assignments and generate feedback</li>
+            <li>To analyze your assignments and generate AI feedback</li>
             <li>To save your study sessions, chat history, and exam attempts</li>
-            <li>To send important account notifications (not marketing spam)</li>
+            <li>To generate your daily AI study plan</li>
+            <li>To curate and generate blog content relevant to your weak topics</li>
+            <li>To send important account notifications (not unsolicited marketing)</li>
             <li>To improve our AI models and app features</li>
             <li>To ensure the security and integrity of our platform</li>
           </ul>
         </Section>
 
-        <Section title="3. AI & Data Processing">
+        {/* 3 */}
+        <Section id="ai" title="3. AI & Data Processing">
           <p>
-            BarPrep AI uses artificial intelligence to power study recommendations,
-            question generation, and assignment analysis. When you interact with
-            our AI features:
+            BarPrep AI uses artificial intelligence to power study
+            recommendations, question generation, and assignment analysis.
+            When you interact with our AI features:
           </p>
           <ul className="list-disc pl-5 space-y-1.5">
             <li>
               Your questions and assignment text may be sent to AI providers
-              (such as OpenAI or Google) for processing.
+              (such as Groq, OpenAI, or compatible providers) for processing.
             </li>
             <li>
-              We do not store your raw AI conversations with third-party providers
-              beyond what is necessary for the service.
+              We do not store your raw AI conversations with third-party
+              providers beyond what is necessary for the service.
             </li>
             <li>
               AI providers have their own privacy policies which apply to
               data processed through their APIs.
             </li>
             <li>
-              Do not submit sensitive personal information (SSN, financial data,
-              etc.) in your assignments or chat messages.
+              Do not submit sensitive personal information (SSN, financial
+              data, etc.) in assignments or chat messages.
+            </li>
+            <li>
+              AI-generated responses may be saved to your Supabase account
+              as part of your chat history for continuity.
             </li>
           </ul>
         </Section>
 
-        <Section title="4. Data Storage & Security">
+        {/* 4 — NEW: Blog & Scraper */}
+        <Section id="blog" title="4. Blog & Web Scraper Data">
+          <p>
+            BarPrep AI operates an AI-powered blog and a web content
+            scraper to provide educational bar prep content:
+          </p>
+          <ul className="list-disc pl-5 space-y-1.5">
+            <li>
+              <span className="font-semibold text-slate-800">
+                Pollinations AI:
+              </span>{' '}
+              Blog articles and cover images are generated by Pollinations AI.
+              Topic prompts (not personal data) are sent to Pollinations AI
+              to generate content. See{' '}
+              <a
+                href="https://pollinations.ai"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-600 hover:underline"
+              >
+                Pollinations AI's privacy policy
+              </a>{' '}
+              for how they handle data.
+            </li>
+            <li>
+              <span className="font-semibold text-slate-800">
+                Web Scraper:
+              </span>{' '}
+              We scrape publicly available bar prep content from authorized
+              sources to build our AI knowledge base. We only scrape content
+              from sites that permit it under their terms. No personal user
+              data is scraped or shared.
+            </li>
+            <li>
+              <span className="font-semibold text-slate-800">
+                Blog Reading:
+              </span>{' '}
+              We may track which blog posts you read to personalize content
+              recommendations. This data is stored locally and in your
+              Supabase profile.
+            </li>
+            <li>
+              <span className="font-semibold text-slate-800">
+                AI Blog Disclaimer:
+              </span>{' '}
+              Blog content is AI-generated and not reviewed by licensed
+              attorneys. It is for educational purposes only.
+            </li>
+          </ul>
+        </Section>
+
+        {/* 5 */}
+        <Section id="storage" title="5. Data Storage & Security">
           <p>
             Your data is stored securely using Supabase, a trusted cloud
             database provider with enterprise-grade security:
@@ -111,34 +229,56 @@ export default function PrivacyPolicy() {
             <li>Passwords are hashed and never stored in plain text</li>
             <li>Row-level security ensures you can only access your own data</li>
             <li>Regular security audits and backups are performed</li>
-            <li>Data is stored in secure cloud infrastructure</li>
+            <li>Data is stored in secure AWS cloud infrastructure</li>
+            <li>
+              Uploaded files (PDFs, assignments) are stored in Supabase
+              Storage with private access controls
+            </li>
           </ul>
         </Section>
 
-        <Section title="5. Cookies">
+        {/* 6 */}
+        <Section id="cookies" title="6. Cookies">
           <p>
             We use cookies to keep you logged in, remember your preferences,
             and analyze app usage. See our{' '}
-            <Link to="/cookies"
-              className="text-blue-600 hover:underline font-medium">
+            <Link to="/cookies" className="text-blue-600 hover:underline font-medium">
               Cookie Policy
             </Link>{' '}
-            for full details.
+            for full details including a complete list of all cookies used.
           </p>
         </Section>
 
-        <Section title="6. Data Sharing">
+        {/* 7 */}
+        <Section id="sharing" title="7. Data Sharing">
           <p>
-            We do <span className="font-bold text-slate-800">NOT</span>{' '}
-            sell your personal data. We may share data with:
+            We do{' '}
+            <span className="font-bold text-slate-800">NOT</span>{' '}
+            sell your personal data. We may share data only with:
           </p>
           <ul className="list-disc pl-5 space-y-1.5">
             <li>
+              <span className="font-semibold text-slate-800">Supabase:</span>{' '}
+              Database, authentication, and file storage provider.
+            </li>
+            <li>
               <span className="font-semibold text-slate-800">
-                Service Providers:
+                AI Providers (Groq / OpenAI-compatible):
               </span>{' '}
-              Supabase (database), AI API providers (question generation),
-              for the sole purpose of providing our service.
+              For AI chat, question generation, and assignment analysis.
+              Only your typed input is sent — not your personal account data.
+            </li>
+            <li>
+              <span className="font-semibold text-slate-800">
+                Pollinations AI:
+              </span>{' '}
+              For blog article and image generation. Topic prompts only —
+              no personal user data is sent.
+            </li>
+            <li>
+              <span className="font-semibold text-slate-800">YouTube:</span>{' '}
+              Embedded tutorial videos may be subject to YouTube/Google's
+              privacy policies when played.
             </li>
             <li>
               <span className="font-semibold text-slate-800">
@@ -149,7 +289,37 @@ export default function PrivacyPolicy() {
           </ul>
         </Section>
 
-        <Section title="7. Your Rights">
+        {/* 8 — NEW: Email & Newsletter */}
+        <Section id="email" title="8. Email & Newsletter">
+          <p>
+            If you subscribe to our newsletter or contact form:
+          </p>
+          <ul className="list-disc pl-5 space-y-1.5">
+            <li>
+              Your email is stored in our Supabase database and used only
+              to send study tips, bar prep updates, and product announcements.
+            </li>
+            <li>
+              We never sell or share your email address with third parties
+              for marketing purposes.
+            </li>
+            <li>
+              You can unsubscribe at any time by emailing{' '}
+              <a href={`mailto:${PRIVACY_EMAIL}`}
+                 className="text-blue-600 hover:underline">
+                {PRIVACY_EMAIL}
+              </a>{' '}
+              with the subject "Unsubscribe".
+            </li>
+            <li>
+              Contact form submissions are stored in Supabase and used
+              only to respond to your inquiry.
+            </li>
+          </ul>
+        </Section>
+
+        {/* 9 */}
+        <Section id="rights" title="9. Your Rights">
           <p>You have the following rights regarding your data:</p>
           <ul className="list-disc pl-5 space-y-1.5">
             <li>
@@ -170,77 +340,139 @@ export default function PrivacyPolicy() {
             </li>
             <li>
               <span className="font-semibold text-slate-800">Objection:</span>{' '}
-              Opt out of non-essential data processing
+              Opt out of non-essential data processing and newsletter emails
+            </li>
+            <li>
+              <span className="font-semibold text-slate-800">
+                Cookie Control:
+              </span>{' '}
+              Manage cookie preferences via our{' '}
+              <Link to="/cookies" className="text-blue-600 hover:underline">
+                Cookie Settings
+              </Link>
             </li>
           </ul>
           <p className="mt-2">
             To exercise these rights, contact us at{' '}
-            <a href="mailto:privacy@barprepai.com"
-              className="text-blue-600 hover:underline">
-              privacy@barprepai.com
-            </a>
+            <a href={`mailto:${PRIVACY_EMAIL}`}
+               className="text-blue-600 hover:underline">
+              {PRIVACY_EMAIL}
+            </a>.
+            We respond within 30 days.
           </p>
         </Section>
 
-        <Section title="8. Children's Privacy">
+        {/* 10 */}
+        <Section id="children" title="10. Children's Privacy">
           <p>
-            BarPrep AI is designed for adults preparing for the bar exam.
-            We do not knowingly collect data from anyone under 18 years of age.
-            If you believe a minor has created an account, please contact us immediately.
+            BarPrep AI is designed for adults (18+) preparing for the bar
+            exam. We do not knowingly collect data from anyone under 18
+            years of age. If you believe a minor has created an account,
+            please contact us immediately at{' '}
+            <a href={`mailto:${PRIVACY_EMAIL}`}
+               className="text-blue-600 hover:underline">
+              {PRIVACY_EMAIL}
+            </a>.
           </p>
         </Section>
 
-        <Section title="9. GDPR & CCPA Compliance">
+        {/* 11 */}
+        <Section id="gdpr" title="11. GDPR & CCPA Compliance">
           <p>
-            If you are located in the European Union or California,
-            you have additional rights under GDPR and CCPA respectively,
-            including the right to know, delete, and opt out of data sale.
-            We honor all such requests submitted to our privacy email.
+            Depending on your location, you may have additional rights:
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2">
+            {[
+              {
+                law:   'GDPR (EU/UK)',
+                desc:  'Right to access, rectification, erasure, restriction, portability, and objection to processing.',
+              },
+              {
+                law:   'CCPA (California)',
+                desc:  'Right to know what data is collected, right to delete, right to opt-out of sale (we do not sell data).',
+              },
+            ].map(({ law, desc }) => (
+              <div key={law}
+                   className="bg-white border border-slate-200 rounded-xl p-4">
+                <p className="text-xs font-bold text-slate-800 mb-1">{law}</p>
+                <p className="text-xs text-slate-500">{desc}</p>
+              </div>
+            ))}
+          </div>
+          <p className="mt-3">
+            To exercise these rights, email{' '}
+            <a href={`mailto:${PRIVACY_EMAIL}`}
+               className="text-blue-600 hover:underline">
+              {PRIVACY_EMAIL}
+            </a>.
           </p>
         </Section>
 
-        <Section title="10. Changes to This Policy">
+        {/* 12 */}
+        <Section id="changes" title="12. Changes to This Policy">
           <p>
-            We may update this Privacy Policy from time to time.
-            We will notify you of significant changes via email or
-            an in-app notification. Continued use of the app after
-            changes constitutes acceptance of the updated policy.
+            We may update this Privacy Policy from time to time. We will
+            notify you of significant changes via email or an in-app
+            notification. Continued use of the app after changes
+            constitutes acceptance of the updated policy. The "Last updated"
+            date at the top reflects the most recent revision.
           </p>
         </Section>
 
-        <Section title="11. Contact Us">
-          <p>
-            For privacy-related questions or requests:
-          </p>
+        {/* 13 */}
+        <Section id="contact" title="13. Contact Us">
+          <p>For privacy-related questions or requests:</p>
           <div className="bg-slate-50 border border-slate-200
-                          rounded-xl p-4 space-y-1">
-            <p><span className="font-semibold">Email:</span>{' '}
-              <a href="mailto:privacy@barprepai.com"
-                className="text-blue-600 hover:underline">
-                privacy@barprepai.com
+                          rounded-xl p-4 space-y-2">
+            <p>
+              <span className="font-semibold text-slate-800">Email:</span>{' '}
+              <a href={`mailto:${PRIVACY_EMAIL}`}
+                 className="text-blue-600 hover:underline">
+                {PRIVACY_EMAIL}
               </a>
             </p>
-            <p><span className="font-semibold">Response Time:</span>{' '}
+            <p>
+              <span className="font-semibold text-slate-800">
+                Response Time:
+              </span>{' '}
               Within 30 days
+            </p>
+            <p>
+              <span className="font-semibold text-slate-800">
+                Data Requests:
+              </span>{' '}
+              Include "Privacy Request" in your subject line
             </p>
           </div>
         </Section>
 
       </div>
 
-      {/* Bottom Links */}
-      <div className="border-t border-slate-200 pt-6 flex flex-wrap gap-3">
-        <Link to="/terms"
-          className="text-sm text-blue-600 hover:underline font-medium">
+      {/* ── Footer links ── */}
+      <div className="border-t border-slate-200 pt-6 flex flex-wrap gap-4">
+        <Link
+          to="/terms"
+          className="text-sm text-blue-600 hover:underline font-medium"
+        >
           Terms of Service →
         </Link>
-        <Link to="/cookies"
-          className="text-sm text-blue-600 hover:underline font-medium">
+        <Link
+          to="/cookies"
+          className="text-sm text-blue-600 hover:underline font-medium"
+        >
           Cookie Policy →
         </Link>
-        <Link to="/disclaimer"
-          className="text-sm text-blue-600 hover:underline font-medium">
+        <Link
+          to="/disclaimer"
+          className="text-sm text-blue-600 hover:underline font-medium"
+        >
           Disclaimer →
+        </Link>
+        <Link
+          to="/contact"
+          className="text-sm text-blue-600 hover:underline font-medium"
+        >
+          Contact Us →
         </Link>
       </div>
 

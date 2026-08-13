@@ -8,89 +8,95 @@ const FUNCTIONS_URL     = `${SUPABASE_URL}/functions/v1`
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
 
-// Supabase Edge Functions
+// ── Supabase Edge Functions API ───────────────────────────────────────────────
 const api = axios.create({
   baseURL: FUNCTIONS_URL,
   timeout: 60000,
   headers: {
-    'Content-Type':  'application/json',
-    'apikey':        SUPABASE_ANON_KEY,
+    'Content-Type': 'application/json',
+    'apikey':       SUPABASE_ANON_KEY,
   },
 })
 
-// Attach the CURRENT logged-in user's session token on every request.
-// Without this, every call was authenticated as the anon key instead of
-// the actual student, so the backend had no reliable way to scope chat
-// sessions (or anything else) to a single user.
+// ── Attach session token ──────────────────────────────────────────────────────
 api.interceptors.request.use(async (config) => {
   const { data: { session } } = await supabase.auth.getSession()
   config.headers.Authorization = `Bearer ${session?.access_token || SUPABASE_ANON_KEY}`
   return config
 })
 
-// Render Backend for video processing
+// ── Request logging ───────────────────────────────────────────────────────────
+api.interceptors.request.use((config) => {
+  if (import.meta.env.DEV) {
+    console.log(`Supabase: ${config.method?.toUpperCase()} ${config.url}`)
+  }
+  return config
+})
+
+// ── Render Backend ────────────────────────────────────────────────────────────
 const backendApi = axios.create({
   baseURL: BACKEND_URL,
   timeout: 120000,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-})
-
-api.interceptors.request.use((config) => {
-  console.log(`Supabase: ${config.method?.toUpperCase()} ${config.url}`)
-  return config
+  headers: { 'Content-Type': 'application/json' },
 })
 
 backendApi.interceptors.request.use((config) => {
-  console.log(`Backend: ${config.method?.toUpperCase()} ${config.url}`)
+  if (import.meta.env.DEV) {
+    console.log(`Backend: ${config.method?.toUpperCase()} ${config.url}`)
+  }
   return config
 })
 
+// ── Error handlers ────────────────────────────────────────────────────────────
 api.interceptors.response.use(
-  (response) => response,
-  (error) => {
+  res => res,
+  err => {
     const message =
-      error.response?.data?.error   ||
-      error.response?.data?.message ||
-      error.message                 ||
+      err.response?.data?.error   ||
+      err.response?.data?.message ||
+      err.message                 ||
       'Something went wrong'
-    console.error('Supabase API Error:', message)
+    if (import.meta.env.DEV) console.error('Supabase API Error:', message)
     return Promise.reject(new Error(message))
   }
 )
 
 backendApi.interceptors.response.use(
-  (response) => response,
-  (error) => {
+  res => res,
+  err => {
     const message =
-      error.response?.data?.detail  ||
-      error.response?.data?.error   ||
-      error.message                 ||
+      err.response?.data?.detail ||
+      err.response?.data?.error  ||
+      err.message                ||
       'Video processing failed'
-    console.error('Backend Error:', message)
+    if (import.meta.env.DEV) console.error('Backend Error:', message)
     return Promise.reject(new Error(message))
   }
 )
 
+// ── API Client ────────────────────────────────────────────────────────────────
 export const apiClient = {
-  // ---- Supabase Edge Functions ----
 
+  // ── Health ──────────────────────────────────────────────────────────────────
   getHealth: () =>
     api.get('/health'),
 
+  // ── Affirmation ─────────────────────────────────────────────────────────────
   getAffirmation: () =>
     api.get('/affirmation'),
 
+  // ── Chat ────────────────────────────────────────────────────────────────────
   chat: (message, history = []) =>
     api.post('/chat', { message, history }),
 
+  // ── Ingestion ───────────────────────────────────────────────────────────────
   ingestUrl: (url) =>
     api.post('/ingest-url', { url }),
 
   ingestYoutube: (url) =>
     api.post('/ingest-youtube', { url }),
 
+  // ── Mock Exam ───────────────────────────────────────────────────────────────
   generateQuestion: (topic) =>
     api.post('/mock-exam', { action: 'generate', topic }),
 
@@ -103,25 +109,22 @@ export const apiClient = {
       rationale,
     }),
 
+  // ── Modules ─────────────────────────────────────────────────────────────────
   getModules: (topic = '', all = false) =>
     api.get(`/get-modules?topic=${encodeURIComponent(topic)}&all=${all}`),
 
+  // ── PDF ─────────────────────────────────────────────────────────────────────
+  processPdf: (storage_path, filename, document_id) =>
+    api.post('/process-pdf', { storage_path, filename, document_id }),
+
+  // ── Admin Auth ──────────────────────────────────────────────────────────────
   adminLogin: (password) =>
     api.post('/admin-auth', { action: 'login', password }),
 
   adminVerify: (token) =>
     api.post('/admin-auth', { action: 'verify', password: token }),
 
-  processPdf: (storage_path, filename, document_id) =>
-    api.post('/process-pdf', { storage_path, filename, document_id }),
-
-  // ---- Render Backend ----
-
-  processVideo: (url, topic, order_index = 0) =>
-    backendApi.post('/api/process-video', { url, topic, order_index }),
-
-  // ---- Chat Sessions ----
-
+  // ── Chat Sessions ───────────────────────────────────────────────────────────
   getSessions: () =>
     api.get('/chat-sessions'),
 
@@ -137,12 +140,96 @@ export const apiClient = {
   deleteSession: (id) =>
     api.post('/chat-sessions', { action: 'delete', id }),
 
-  // Admin-only: list every student's chat sessions.
-  // Requires the chat-sessions Edge Function to support an 'admin_list'
-  // action that checks admin_token and uses the service-role key to
-  // bypass per-user RLS.
   adminGetAllSessions: (adminToken) =>
     api.post('/chat-sessions', { action: 'admin_list', admin_token: adminToken }),
+
+  // ── Video Processing (Render Backend) ───────────────────────────────────────
+  processVideo: (url, topic, order_index = 0) =>
+    backendApi.post('/api/process-video', { url, topic, order_index }),
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // SCRAPER ENDPOINTS
+  // ══════════════════════════════════════════════════════════════════════════
+
+  // Trigger scrape of a URL and save to Supabase scraped_data table
+  triggerScrape: (url, topic = '') =>
+    api.post('/scraper', { action: 'scrape', url, topic }),
+
+  // Get all scraped data (admin)
+  getScrapedData: (topic = '', limit = 20) =>
+    api.get(`/scraper?action=list&topic=${encodeURIComponent(topic)}&limit=${limit}`),
+
+  // Delete scraped item
+  deleteScrapedItem: (id) =>
+    api.post('/scraper', { action: 'delete', id }),
+
+  // Sync scraped data to AI knowledge base
+  syncScrapedToKnowledge: (id) =>
+    api.post('/scraper', { action: 'sync', id }),
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // BLOG ENDPOINTS
+  // ══════════════════════════════════════════════════════════════════════════
+
+  // Get published blog posts (public)
+  getBlogPosts: ({
+    page    = 0,
+    limit   = 12,
+    topic   = '',
+    search  = '',
+  } = {}) =>
+    api.get(
+      `/blog?action=list` +
+      `&page=${page}` +
+      `&limit=${limit}` +
+      `&topic=${encodeURIComponent(topic)}` +
+      `&search=${encodeURIComponent(search)}`
+    ),
+
+  // Get single blog post by slug (public)
+  getBlogPost: (slug) =>
+    api.get(`/blog?action=get&slug=${encodeURIComponent(slug)}`),
+
+  // Generate a new blog post using Pollinations AI (admin)
+  generateBlogPost: ({ topic, source_url = '', custom_prompt = '' }) =>
+    api.post('/blog', {
+      action: 'generate',
+      topic,
+      source_url,
+      custom_prompt,
+    }),
+
+  // Generate blog image using Pollinations AI (admin)
+  generateBlogImage: (prompt) =>
+    api.post('/blog', { action: 'generate_image', prompt }),
+
+  // Publish a blog post (admin)
+  publishBlogPost: (id) =>
+    api.post('/blog', { action: 'publish', id }),
+
+  // Unpublish a blog post (admin)
+  unpublishBlogPost: (id) =>
+    api.post('/blog', { action: 'unpublish', id }),
+
+  // Delete a blog post (admin)
+  deleteBlogPost: (id) =>
+    api.post('/blog', { action: 'delete', id }),
+
+  // Get all blog posts including drafts (admin)
+  adminGetBlogPosts: (adminToken, status = 'all') =>
+    api.post('/blog', {
+      action:      'admin_list',
+      admin_token: adminToken,
+      status,
+    }),
+
+  // Update blog post content (admin)
+  updateBlogPost: (id, updates) =>
+    api.post('/blog', { action: 'update', id, ...updates }),
+
+  // ── Newsletter ──────────────────────────────────────────────────────────────
+  subscribeNewsletter: (email) =>
+    api.post('/newsletter', { email }),
 }
 
 export default api

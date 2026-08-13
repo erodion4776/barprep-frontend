@@ -23,31 +23,115 @@ const TABS = [
 ]
 
 const QUICK_ADD_URLS = [
-  { label: 'Constitutional Law', url: 'https://www.law.cornell.edu/wex/constitutional_law', topic: 'Constitutional Law' },
-  { label: 'Contracts',          url: 'https://www.law.cornell.edu/wex/contract',           topic: 'Contracts'          },
-  { label: 'Torts',              url: 'https://www.law.cornell.edu/wex/tort',               topic: 'Torts'              },
-  { label: 'Criminal Law',       url: 'https://www.law.cornell.edu/wex/criminal_law',       topic: 'Criminal Law'       },
-  { label: 'Civil Procedure',    url: 'https://www.law.cornell.edu/wex/civil_procedure',    topic: 'Civil Procedure'    },
-  { label: 'Evidence',           url: 'https://www.law.cornell.edu/wex/evidence',           topic: 'Evidence'           },
-  { label: 'Real Property',      url: 'https://www.law.cornell.edu/wex/property',           topic: 'Real Property'      },
-  { label: 'Family Law',         url: 'https://www.law.cornell.edu/wex/family_law',         topic: 'Family Law'         },
-  { label: 'Negligence',         url: 'https://www.law.cornell.edu/wex/negligence',         topic: 'Torts'              },
-  { label: 'Due Process',        url: 'https://www.law.cornell.edu/wex/due_process',        topic: 'Constitutional Law' },
-  { label: 'Business Association',url:'https://www.law.cornell.edu/wex/business_association',topic:'Business Associations'},
-  { label: 'Wills',              url: 'https://www.law.cornell.edu/wex/will',               topic: 'Wills & Trusts'     },
-  { label: 'Trust',              url: 'https://www.law.cornell.edu/wex/trust',              topic: 'Wills & Trusts'     },
-  { label: 'Hearsay',            url: 'https://www.law.cornell.edu/wex/hearsay',            topic: 'Evidence'           },
-  { label: 'Consideration',      url: 'https://www.law.cornell.edu/wex/consideration',      topic: 'Contracts'          },
-  { label: 'Mens Rea',           url: 'https://www.law.cornell.edu/wex/mens_rea',           topic: 'Criminal Law'       },
-  { label: 'Jurisdiction',       url: 'https://www.law.cornell.edu/wex/jurisdiction',       topic: 'Civil Procedure'    },
-  { label: 'Easement',           url: 'https://www.law.cornell.edu/wex/easement',           topic: 'Real Property'      },
-  { label: 'Partnership',        url: 'https://www.law.cornell.edu/wex/partnership',        topic: 'Business Associations'},
-  { label: 'Corporation',        url: 'https://www.law.cornell.edu/wex/corporation',        topic: 'Business Associations'},
-  { label: 'Mens Rea',           url: 'https://www.law.cornell.edu/wex/mens_rea',           topic: 'Criminal Law'       },
-  { label: 'Equal Protection',   url: 'https://www.law.cornell.edu/wex/equal_protection',   topic: 'Constitutional Law' },
-  { label: 'Adverse Possession', url: 'https://www.law.cornell.edu/wex/adverse_possession', topic: 'Real Property'      },
-  { label: 'Strict Liability',   url: 'https://www.law.cornell.edu/wex/strict_liability',   topic: 'Torts'              },
-  { label: 'Defamation',         url: 'https://www.law.cornell.edu/wex/defamation',         topic: 'Torts'              },
+  // ── Cornell Law WEX ──────────────────────────────────────────────────────
+  { label: 'Constitutional Law',  url: 'https://www.law.cornell.edu/wex/constitutional_law',  topic: 'Constitutional Law'   },
+  { label: 'Contracts',           url: 'https://www.law.cornell.edu/wex/contract',            topic: 'Contracts'            },
+  { label: 'Torts',               url: 'https://www.law.cornell.edu/wex/tort',                topic: 'Torts'                },
+  { label: 'Criminal Law',        url: 'https://www.law.cornell.edu/wex/criminal_law',        topic: 'Criminal Law'         },
+  { label: 'Civil Procedure',     url: 'https://www.law.cornell.edu/wex/civil_procedure',     topic: 'Civil Procedure'      },
+  { label: 'Evidence',            url: 'https://www.law.cornell.edu/wex/evidence',            topic: 'Evidence'             },
+  { label: 'Real Property',       url: 'https://www.law.cornell.edu/wex/property',            topic: 'Real Property'        },
+  { label: 'Family Law',          url: 'https://www.law.cornell.edu/wex/family_law',          topic: 'Family Law'           },
+  { label: 'Negligence',          url: 'https://www.law.cornell.edu/wex/negligence',          topic: 'Torts'                },
+  { label: 'Due Process',         url: 'https://www.law.cornell.edu/wex/due_process',         topic: 'Constitutional Law'   },
+  { label: 'Business Association', url: 'https://www.law.cornell.edu/wex/business_association', topic: 'Business Associations'},
+  { label: 'Wills',               url: 'https://www.law.cornell.edu/wex/will',                topic: 'Wills & Trusts'       },
+  { label: 'Trust',               url: 'https://www.law.cornell.edu/wex/trust',               topic: 'Wills & Trusts'       },
+  { label: 'Hearsay',             url: 'https://www.law.cornell.edu/wex/hearsay',             topic: 'Evidence'             },
+  { label: 'Consideration',       url: 'https://www.law.cornell.edu/wex/consideration',       topic: 'Contracts'            },
+  { label: 'Mens Rea',            url: 'https://www.law.cornell.edu/wex/mens_rea',            topic: 'Criminal Law'         },
+  { label: 'Jurisdiction',        url: 'https://www.law.cornell.edu/wex/jurisdiction',        topic: 'Civil Procedure'      },
+  { label: 'Easement',            url: 'https://www.law.cornell.edu/wex/easement',            topic: 'Real Property'        },
+  { label: 'Partnership',         url: 'https://www.law.cornell.edu/wex/partnership',         topic: 'Business Associations'},
+  { label: 'Corporation',         url: 'https://www.law.cornell.edu/wex/corporation',         topic: 'Business Associations'},
+  { label: 'Equal Protection',    url: 'https://www.law.cornell.edu/wex/equal_protection',    topic: 'Constitutional Law'   },
+  { label: 'Adverse Possession',  url: 'https://www.law.cornell.edu/wex/adverse_possession',  topic: 'Real Property'        },
+  { label: 'Strict Liability',    url: 'https://www.law.cornell.edu/wex/strict_liability',    topic: 'Torts'                },
+  { label: 'Defamation',          url: 'https://www.law.cornell.edu/wex/defamation',          topic: 'Torts'                },
+  { label: 'Offer',               url: 'https://www.law.cornell.edu/wex/offer',               topic: 'Contracts'            },
+  { label: 'Acceptance',          url: 'https://www.law.cornell.edu/wex/acceptance',          topic: 'Contracts'            },
+  { label: 'Breach of Contract',  url: 'https://www.law.cornell.edu/wex/breach_of_contract',  topic: 'Contracts'            },
+  { label: 'Promissory Estoppel', url: 'https://www.law.cornell.edu/wex/promissory_estoppel', topic: 'Contracts'            },
+  { label: 'Damages',             url: 'https://www.law.cornell.edu/wex/damages',             topic: 'Contracts'            },
+  { label: 'Proximate Cause',     url: 'https://www.law.cornell.edu/wex/proximate_cause',     topic: 'Torts'                },
+  { label: 'Products Liability',  url: 'https://www.law.cornell.edu/wex/products_liability',  topic: 'Torts'                },
+  { label: 'Murder',              url: 'https://www.law.cornell.edu/wex/murder',              topic: 'Criminal Law'         },
+  { label: 'Self Defense',        url: 'https://www.law.cornell.edu/wex/self_defense',        topic: 'Criminal Law'         },
+  { label: 'Conspiracy',          url: 'https://www.law.cornell.edu/wex/conspiracy',          topic: 'Criminal Law'         },
+  { label: 'Personal Jurisdiction',url:'https://www.law.cornell.edu/wex/personal_jurisdiction',topic: 'Civil Procedure'     },
+  { label: 'Res Judicata',        url: 'https://www.law.cornell.edu/wex/res_judicata',        topic: 'Civil Procedure'      },
+  { label: 'Privilege (Evidence)',url: 'https://www.law.cornell.edu/wex/privilege',            topic: 'Evidence'             },
+  { label: 'Commerce Clause',     url: 'https://www.law.cornell.edu/wex/commerce_clause',     topic: 'Constitutional Law'   },
+  { label: 'First Amendment',     url: 'https://www.law.cornell.edu/wex/first_amendment',     topic: 'Constitutional Law'   },
+  { label: 'Fourth Amendment',    url: 'https://www.law.cornell.edu/wex/fourth_amendment',    topic: 'Constitutional Law'   },
+  { label: 'Fee Simple',          url: 'https://www.law.cornell.edu/wex/fee_simple',          topic: 'Real Property'        },
+  { label: 'Mortgage',            url: 'https://www.law.cornell.edu/wex/mortgage',            topic: 'Real Property'        },
+  { label: 'Fiduciary Duty',      url: 'https://www.law.cornell.edu/wex/fiduciary_duty',      topic: 'Business Associations'},
+  { label: 'Agency',              url: 'https://www.law.cornell.edu/wex/agency',              topic: 'Business Associations'},
+  { label: 'Intestacy',           url: 'https://www.law.cornell.edu/wex/intestacy',           topic: 'Wills & Trusts'       },
+  { label: 'Probate',             url: 'https://www.law.cornell.edu/wex/probate',             topic: 'Wills & Trusts'       },
+  { label: 'Divorce',             url: 'https://www.law.cornell.edu/wex/divorce',             topic: 'Family Law'           },
+  { label: 'Child Custody',       url: 'https://www.law.cornell.edu/wex/child_custody',       topic: 'Family Law'           },
+
+  // ── Federal Rules ─────────────────────────────────────────────────────────
+  { label: 'Fed Rules Evidence',  url: 'https://www.law.cornell.edu/rules/fre',               topic: 'Evidence'             },
+  { label: 'Fed Rules Civ Pro',   url: 'https://www.law.cornell.edu/rules/frcp',              topic: 'Civil Procedure'      },
+  { label: 'UCC Article 1',       url: 'https://www.law.cornell.edu/ucc/1/',                  topic: 'Contracts'            },
+  { label: 'UCC Article 2',       url: 'https://www.law.cornell.edu/ucc/2/',                  topic: 'Contracts'            },
+
+  // ── Wikipedia ─────────────────────────────────────────────────────────────
+  { label: 'Wiki: Erie Doctrine',        url: 'https://en.wikipedia.org/wiki/Erie_Railroad_Co._v._Tompkins',     topic: 'Civil Procedure'    },
+  { label: 'Wiki: Miranda Rights',       url: 'https://en.wikipedia.org/wiki/Miranda_warning',                    topic: 'Criminal Law'       },
+  { label: 'Wiki: Rule vs Perpetuities', url: 'https://en.wikipedia.org/wiki/Rule_against_perpetuities',          topic: 'Wills & Trusts'     },
+  { label: 'Wiki: Felony Murder',        url: 'https://en.wikipedia.org/wiki/Felony_murder_rule',                 topic: 'Criminal Law'       },
+  { label: 'Wiki: Comparative Neg.',     url: 'https://en.wikipedia.org/wiki/Comparative_negligence',             topic: 'Torts'              },
+  { label: 'Wiki: Strict Scrutiny',      url: 'https://en.wikipedia.org/wiki/Strict_scrutiny',                    topic: 'Constitutional Law' },
+  { label: 'Wiki: Res Judicata',         url: 'https://en.wikipedia.org/wiki/Res_judicata',                       topic: 'Civil Procedure'    },
+  { label: 'Wiki: Joint Tenancy',        url: 'https://en.wikipedia.org/wiki/Joint_tenancy',                      topic: 'Real Property'      },
+  { label: 'Wiki: Commerce Clause',      url: 'https://en.wikipedia.org/wiki/Commerce_clause',                    topic: 'Constitutional Law' },
+  { label: 'Wiki: Atty Privilege',       url: 'https://en.wikipedia.org/wiki/Attorney%E2%80%93client_privilege',  topic: 'Evidence'           },
+  { label: 'Wiki: Respondeat Superior',  url: 'https://en.wikipedia.org/wiki/Respondeat_superior',                topic: 'Torts'              },
+  { label: 'Wiki: Community Property',   url: 'https://en.wikipedia.org/wiki/Community_property',                 topic: 'Family Law'         },
+  { label: 'Wiki: Promissory Estoppel',  url: 'https://en.wikipedia.org/wiki/Promissory_estoppel',               topic: 'Contracts'          },
+  { label: 'Wiki: Products Liability',   url: 'https://en.wikipedia.org/wiki/Products_liability',                 topic: 'Torts'              },
+  { label: 'Wiki: Takings Clause',       url: 'https://en.wikipedia.org/wiki/Takings_clause',                     topic: 'Constitutional Law' },
+  { label: 'Wiki: Fiduciary',            url: 'https://en.wikipedia.org/wiki/Fiduciary',                          topic: 'Business Associations'},
+  { label: 'Wiki: Hearsay Exceptions',   url: 'https://en.wikipedia.org/wiki/Excited_utterance',                  topic: 'Evidence'           },
+
+  // ── Findlaw ───────────────────────────────────────────────────────────────
+  { label: 'Findlaw: Negligence',   url: 'https://injury.findlaw.com/accident-injury-law/negligence.html', topic: 'Torts'               },
+  { label: 'Findlaw: Criminal Law', url: 'https://criminal.findlaw.com/criminal-law-basics/',               topic: 'Criminal Law'        },
+  { label: 'Findlaw: Wills',        url: 'https://estate.findlaw.com/wills/',                               topic: 'Wills & Trusts'      },
+  { label: 'Findlaw: Trusts',       url: 'https://estate.findlaw.com/trusts/',                              topic: 'Wills & Trusts'      },
+  { label: 'Findlaw: Divorce',      url: 'https://family.findlaw.com/divorce/',                              topic: 'Family Law'          },
+  { label: 'Findlaw: Corporations', url: 'https://smallbusiness.findlaw.com/corporations/',                  topic: 'Business Associations'},
+  { label: 'Findlaw: Real Estate',  url: 'https://realestate.findlaw.com/landlord-tenant-law/',              topic: 'Real Property'       },
+
+  // ── Nolo ──────────────────────────────────────────────────────────────────
+  { label: 'Nolo: Criminal Law',    url: 'https://www.nolo.com/legal-encyclopedia/criminal-law',            topic: 'Criminal Law'        },
+  { label: 'Nolo: Personal Injury', url: 'https://www.nolo.com/legal-encyclopedia/personal-injury',        topic: 'Torts'               },
+  { label: 'Nolo: Wills & Trusts',  url: 'https://www.nolo.com/legal-encyclopedia/wills-trusts-estates',   topic: 'Wills & Trusts'      },
+  { label: 'Nolo: Real Estate',     url: 'https://www.nolo.com/legal-encyclopedia/real-estate',            topic: 'Real Property'       },
+  { label: 'Nolo: Family Law',      url: 'https://www.nolo.com/legal-encyclopedia/family-law',             topic: 'Family Law'          },
+  { label: 'Nolo: Contracts',       url: 'https://www.nolo.com/legal-encyclopedia/contracts',              topic: 'Contracts'           },
+
+  // ── NCBE Official ─────────────────────────────────────────────────────────
+  { label: 'NCBE: MBE Info',        url: 'https://www.ncbex.org/exams/mbe/',                               topic: 'Constitutional Law'  },
+  { label: 'NCBE: MEE Info',        url: 'https://www.ncbex.org/exams/mee/',                               topic: 'Constitutional Law'  },
+  { label: 'NCBE: UBE Info',        url: 'https://www.ncbex.org/exams/ube/',                               topic: 'Constitutional Law'  },
+
+  // ── Justia ────────────────────────────────────────────────────────────────
+  { label: 'Justia: Constitution',  url: 'https://law.justia.com/constitution/us/',                        topic: 'Constitutional Law'  },
+  { label: 'Justia: 1st Amendment', url: 'https://law.justia.com/constitution/us/amendment-01/',           topic: 'Constitutional Law'  },
+  { label: 'Justia: 4th Amendment', url: 'https://law.justia.com/constitution/us/amendment-04/',           topic: 'Constitutional Law'  },
+  { label: 'Justia: 14th Amendment',url: 'https://law.justia.com/constitution/us/amendment-14/',           topic: 'Constitutional Law'  },
+  { label: 'Justia: Criminal Law',  url: 'https://law.justia.com/topics/criminal-law/',                    topic: 'Criminal Law'        },
+  { label: 'Justia: Torts',         url: 'https://law.justia.com/topics/torts/',                           topic: 'Torts'               },
+  { label: 'Justia: Contracts',     url: 'https://law.justia.com/topics/contracts/',                       topic: 'Contracts'           },
+  { label: 'Justia: Family Law',    url: 'https://law.justia.com/topics/family-law/',                      topic: 'Family Law'          },
+  { label: 'Justia: Property Law',  url: 'https://law.justia.com/topics/property-law/',                    topic: 'Real Property'       },
+  { label: 'Justia: Evidence',      url: 'https://law.justia.com/topics/evidence/',                        topic: 'Evidence'            },
+  { label: 'Justia: Wills & Trusts',url: 'https://law.justia.com/topics/wills-trusts-estates/',            topic: 'Wills & Trusts'      },
 ]
 
 const PROFILES_SQL = `-- 1. Create profiles table
@@ -90,7 +174,9 @@ function Feedback({ result, error, onClearResult, onClearError }) {
                         justify-between gap-3">
           <span>✅ {result}</span>
           <button onClick={onClearResult}
-                  className="shrink-0 text-green-500 hover:text-green-700">✕</button>
+                  className="shrink-0 text-green-500 hover:text-green-700">
+            ✕
+          </button>
         </div>
       )}
       {error && (
@@ -99,7 +185,9 @@ function Feedback({ result, error, onClearResult, onClearError }) {
                         justify-between gap-3">
           <span>❌ {error}</span>
           <button onClick={onClearError}
-                  className="shrink-0 text-red-500 hover:text-red-700">✕</button>
+                  className="shrink-0 text-red-500 hover:text-red-700">
+            ✕
+          </button>
         </div>
       )}
     </>
@@ -108,25 +196,31 @@ function Feedback({ result, error, onClearResult, onClearError }) {
 
 // ── Scraper Tab ───────────────────────────────────────────────────────────────
 function ScraperTab() {
-  const [url,       setUrl]       = useState('')
-  const [topic,     setTopic]     = useState('')
-  const [scraping,  setScraping]  = useState(false)
-  const [result,    setResult]    = useState('')
-  const [error,     setError]     = useState('')
-  const [scraped,   setScraped]   = useState([])
-  const [loadingSc, setLoadingSc] = useState(false)
+  const [url,        setUrl]        = useState('')
+  const [topic,      setTopic]      = useState('')
+  const [scraping,   setScraping]   = useState(false)
+  const [result,     setResult]     = useState('')
+  const [error,      setError]      = useState('')
+  const [scraped,    setScraped]    = useState([])
+  const [loadingSc,  setLoadingSc]  = useState(false)
+  const [filter,     setFilter]     = useState('')
+  const [searchTerm, setSearchTerm] = useState('')
 
   const loadScraped = useCallback(async () => {
     setLoadingSc(true)
+    setError('')
     try {
-      const { data } = await supabase
+      const { data, error: dbErr } = await supabase
         .from('scraped_data')
-        .select('*')
+        .select('id, url, title, topic, word_count, is_indexed, scraped_at, content')
         .order('scraped_at', { ascending: false })
-        .limit(30)
+        .limit(100)
+
+      if (dbErr) throw dbErr
       setScraped(data || [])
     } catch (err) {
       console.error('Load scraped error:', err)
+      setError('Failed to load scraped data: ' + err.message)
     } finally {
       setLoadingSc(false)
     }
@@ -145,7 +239,7 @@ function ScraperTab() {
       setResult(res.data.message || 'Scraped successfully!')
       setUrl('')
       setTopic('')
-      loadScraped()
+      setTimeout(() => loadScraped(), 1500)
     } catch (err) {
       setError(err.message || 'Failed to scrape URL')
     } finally {
@@ -156,15 +250,50 @@ function ScraperTab() {
   const handleDelete = async (id) => {
     if (!window.confirm('Delete this scraped item?')) return
     try {
-      await supabase.from('scraped_data').delete().eq('id', id)
+      const { error: dbErr } = await supabase
+        .from('scraped_data')
+        .delete()
+        .eq('id', id)
+      if (dbErr) throw dbErr
       setScraped(s => s.filter(i => i.id !== id))
+      setResult('Item deleted.')
     } catch (err) {
       setError('Failed to delete: ' + err.message)
     }
   }
 
+  const handleDeleteAll = async () => {
+    if (!window.confirm(`Delete ALL ${scraped.length} scraped items? This cannot be undone.`)) return
+    try {
+      const { error: dbErr } = await supabase
+        .from('scraped_data')
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000')
+      if (dbErr) throw dbErr
+      setScraped([])
+      setResult('All items deleted.')
+    } catch (err) {
+      setError('Failed to delete all: ' + err.message)
+    }
+  }
+
+  // Client-side filter
+  const filtered = scraped.filter(item => {
+    const matchesTopic = !filter || item.topic === filter
+    const matchesSearch = !searchTerm ||
+      item.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.url?.toLowerCase().includes(searchTerm.toLowerCase())
+    return matchesTopic && matchesSearch
+  })
+
+  // Stats
+  const totalWords  = scraped.reduce((sum, i) => sum + (i.word_count || 0), 0)
+  const indexedCount = scraped.filter(i => i.is_indexed).length
+
   return (
     <div className="space-y-6">
+
+      {/* Header */}
       <div>
         <h2 className="text-lg font-semibold text-slate-900">Web Scraper</h2>
         <p className="text-slate-500 text-sm mt-1">
@@ -178,89 +307,229 @@ function ScraperTab() {
         onClearError={() => setError('')}
       />
 
-      {/* Scrape form */}
-      <form onSubmit={handleScrape} className="space-y-3">
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1.5">
-            URL to Scrape
-          </label>
-          <input
-            type="url"
-            value={url}
-            onChange={e => setUrl(e.target.value)}
-            placeholder="https://www.law.cornell.edu/wex/negligence"
-            className="w-full border border-slate-200 rounded-xl px-4 py-2.5
-                       text-sm focus:outline-none focus:border-blue-500
-                       transition-colors"
-            disabled={scraping}
-            required
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1.5">
-            Topic (optional)
-          </label>
-          <select
-            value={topic}
-            onChange={e => setTopic(e.target.value)}
-            className="w-full border border-slate-200 rounded-xl px-4 py-2.5
-                       text-sm focus:outline-none focus:border-blue-500
-                       transition-colors bg-white"
-          >
-            <option value="">-- Select topic --</option>
-            {TOPICS.map(t => (
-              <option key={t} value={t}>{t}</option>
-            ))}
-          </select>
-        </div>
-        <button
-          type="submit"
-          disabled={scraping || !url.trim()}
-          className="w-full py-3 bg-blue-600 text-white font-bold
-                     rounded-xl hover:bg-blue-700 transition-colors
-                     disabled:opacity-60 flex items-center justify-center gap-2"
-        >
-          {scraping
-            ? <><LoadingSpinner size="sm" color="white" /> Scraping…</>
-            : '🕷️ Scrape & Sync to Supabase →'
-          }
-        </button>
-      </form>
-
-      {/* Quick add */}
-      <div className="space-y-2">
-        <p className="text-sm font-medium text-slate-700">
-          Quick Add — Cornell Law WEX (verified URLs):
-        </p>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-          {QUICK_ADD_URLS.map(({ label, url: u, topic: t }) => (
-            <button
-              key={label + u}
-              onClick={() => { setUrl(u); setTopic(t) }}
-              className="p-2 text-left text-xs bg-slate-50 border
-                         border-slate-200 rounded-lg hover:bg-blue-50
-                         hover:border-blue-300 text-slate-600
-                         hover:text-blue-700 transition-colors"
-            >
-              📄 {label}
-            </button>
+      {/* Stats bar */}
+      {scraped.length > 0 && (
+        <div className="grid grid-cols-3 gap-3">
+          {[
+            { label: 'Pages Scraped', value: scraped.length,                  color: 'text-blue-600'  },
+            { label: 'Total Words',   value: totalWords.toLocaleString(),      color: 'text-green-600' },
+            { label: 'Indexed',       value: `${indexedCount}/${scraped.length}`, color: 'text-purple-600'},
+          ].map(({ label, value, color }) => (
+            <div key={label}
+                 className="bg-white border border-slate-200 rounded-xl p-3 text-center">
+              <p className={`text-xl font-black ${color}`}>{value}</p>
+              <p className="text-xs text-slate-500 mt-0.5">{label}</p>
+            </div>
           ))}
+        </div>
+      )}
+
+      {/* Scrape form */}
+      <div className="bg-white border border-slate-200 rounded-xl p-5 space-y-3">
+        <h3 className="font-semibold text-slate-900 text-sm">Scrape New URL</h3>
+        <form onSubmit={handleScrape} className="space-y-3">
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1.5">
+              URL to Scrape
+            </label>
+            <input
+              type="url"
+              value={url}
+              onChange={e => setUrl(e.target.value)}
+              placeholder="https://www.law.cornell.edu/wex/negligence"
+              className="w-full border border-slate-200 rounded-xl px-4 py-2.5
+                         text-sm focus:outline-none focus:border-blue-500
+                         transition-colors"
+              disabled={scraping}
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1.5">
+              Topic (optional)
+            </label>
+            <select
+              value={topic}
+              onChange={e => setTopic(e.target.value)}
+              className="w-full border border-slate-200 rounded-xl px-4 py-2.5
+                         text-sm focus:outline-none focus:border-blue-500
+                         transition-colors bg-white"
+            >
+              <option value="">-- Select topic --</option>
+              {TOPICS.map(t => (
+                <option key={t} value={t}>{t}</option>
+              ))}
+            </select>
+          </div>
+          <button
+            type="submit"
+            disabled={scraping || !url.trim()}
+            className="w-full py-3 bg-blue-600 text-white font-bold rounded-xl
+                       hover:bg-blue-700 transition-colors disabled:opacity-60
+                       flex items-center justify-center gap-2"
+          >
+            {scraping
+              ? <><LoadingSpinner size="sm" color="white" /> Scraping…</>
+              : '🕷️ Scrape & Sync to Supabase →'
+            }
+          </button>
+        </form>
+      </div>
+
+      {/* Quick add — grouped by source */}
+      <div className="space-y-3">
+        <p className="text-sm font-semibold text-slate-700">
+          Quick Add — Click to fill URL field:
+        </p>
+
+        {/* Cornell Law */}
+        <div>
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">
+            📚 Cornell Law WEX
+          </p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-1.5">
+            {QUICK_ADD_URLS
+              .filter(u => u.url.includes('cornell.edu'))
+              .map(({ label, url: u, topic: t }) => (
+                <button
+                  key={label + u}
+                  onClick={() => { setUrl(u); setTopic(t) }}
+                  className="p-2 text-left text-xs bg-blue-50 border
+                             border-blue-100 rounded-lg hover:bg-blue-100
+                             hover:border-blue-300 text-blue-700
+                             transition-colors"
+                >
+                  📄 {label}
+                </button>
+              ))}
+          </div>
+        </div>
+
+        {/* Wikipedia */}
+        <div>
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">
+            🌐 Wikipedia
+          </p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-1.5">
+            {QUICK_ADD_URLS
+              .filter(u => u.url.includes('wikipedia.org'))
+              .map(({ label, url: u, topic: t }) => (
+                <button
+                  key={label + u}
+                  onClick={() => { setUrl(u); setTopic(t) }}
+                  className="p-2 text-left text-xs bg-slate-50 border
+                             border-slate-200 rounded-lg hover:bg-slate-100
+                             hover:border-slate-300 text-slate-700
+                             transition-colors"
+                >
+                  🌐 {label.replace('Wiki: ', '')}
+                </button>
+              ))}
+          </div>
+        </div>
+
+        {/* Findlaw + Nolo */}
+        <div>
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">
+            ⚖️ Findlaw & Nolo
+          </p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-1.5">
+            {QUICK_ADD_URLS
+              .filter(u => u.url.includes('findlaw.com') || u.url.includes('nolo.com'))
+              .map(({ label, url: u, topic: t }) => (
+                <button
+                  key={label + u}
+                  onClick={() => { setUrl(u); setTopic(t) }}
+                  className="p-2 text-left text-xs bg-green-50 border
+                             border-green-100 rounded-lg hover:bg-green-100
+                             hover:border-green-300 text-green-700
+                             transition-colors"
+                >
+                  ⚖️ {label.replace('Findlaw: ', '').replace('Nolo: ', '')}
+                </button>
+              ))}
+          </div>
+        </div>
+
+        {/* NCBE + Justia */}
+        <div>
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">
+            🏛️ NCBE & Justia
+          </p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-1.5">
+            {QUICK_ADD_URLS
+              .filter(u => u.url.includes('ncbex.org') || u.url.includes('justia.com'))
+              .map(({ label, url: u, topic: t }) => (
+                <button
+                  key={label + u}
+                  onClick={() => { setUrl(u); setTopic(t) }}
+                  className="p-2 text-left text-xs bg-purple-50 border
+                             border-purple-100 rounded-lg hover:bg-purple-100
+                             hover:border-purple-300 text-purple-700
+                             transition-colors"
+                >
+                  🏛️ {label.replace('NCBE: ', '').replace('Justia: ', '')}
+                </button>
+              ))}
+          </div>
         </div>
       </div>
 
       {/* Scraped data list */}
       <div className="space-y-3">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-3">
           <h3 className="text-sm font-semibold text-slate-700 uppercase tracking-wider">
-            Scraped Data ({scraped.length})
+            Scraped Data ({filtered.length} / {scraped.length})
           </h3>
-          <button
-            onClick={loadScraped}
-            className="text-xs text-blue-600 hover:underline"
-          >
-            ↻ Refresh
-          </button>
+          <div className="flex items-center gap-2">
+            {scraped.length > 0 && (
+              <button
+                onClick={handleDeleteAll}
+                className="text-xs text-red-500 hover:text-red-700
+                           hover:underline transition-colors"
+              >
+                Delete All
+              </button>
+            )}
+            <button
+              onClick={loadScraped}
+              disabled={loadingSc}
+              className="text-xs text-blue-600 hover:underline
+                         disabled:opacity-50 px-3 py-1.5 border
+                         border-blue-200 rounded-lg hover:bg-blue-50
+                         transition-colors"
+            >
+              {loadingSc ? 'Loading…' : '↻ Refresh'}
+            </button>
+          </div>
         </div>
+
+        {/* Filter + search */}
+        {scraped.length > 0 && (
+          <div className="flex gap-2 flex-wrap">
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              placeholder="Search by title or URL..."
+              className="flex-1 min-w-[200px] border border-slate-200 rounded-xl
+                         px-3 py-1.5 text-xs focus:outline-none
+                         focus:border-blue-500 transition-colors"
+            />
+            <select
+              value={filter}
+              onChange={e => setFilter(e.target.value)}
+              className="border border-slate-200 rounded-xl px-3 py-1.5
+                         text-xs focus:outline-none focus:border-blue-500
+                         transition-colors bg-white"
+            >
+              <option value="">All Topics</option>
+              {TOPICS.map(t => (
+                <option key={t} value={t}>{t}</option>
+              ))}
+            </select>
+          </div>
+        )}
 
         {loadingSc ? (
           <div className="py-8 flex justify-center">
@@ -268,69 +537,108 @@ function ScraperTab() {
           </div>
         ) : scraped.length === 0 ? (
           <div className="bg-white border border-slate-200 rounded-xl
+                          text-center py-10 space-y-2">
+            <p className="text-3xl">🕷️</p>
+            <p className="text-slate-500 text-sm font-medium">
+              No scraped data yet.
+            </p>
+            <p className="text-slate-400 text-xs">
+              Use the form above or click a Quick Add button to scrape your first URL.
+            </p>
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="bg-white border border-slate-200 rounded-xl
                           text-center py-8">
             <p className="text-slate-500 text-sm">
-              No scraped data yet. Use the form above to scrape a URL.
+              No results match your filter.
             </p>
           </div>
         ) : (
-          scraped.map(item => (
-            <div key={item.id}
-                 className="bg-white border border-slate-200 rounded-xl
-                             p-4 space-y-2">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-slate-900 truncate">
-                    {item.title || 'Untitled'}
-                  </p>
-                  <a
-                    href={item.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs text-blue-600 hover:underline truncate block"
-                  >
-                    {item.url}
-                  </a>
-                  <div className="flex items-center gap-3 mt-1 flex-wrap">
-                    {item.topic && (
-                      <span className="text-[10px] bg-blue-100 text-blue-700
-                                       px-2 py-0.5 rounded-full font-medium">
-                        {item.topic}
+          <div className="space-y-3">
+            {filtered.map(item => (
+              <div
+                key={item.id}
+                className="bg-white border border-slate-200 rounded-xl
+                           p-4 space-y-2 hover:border-slate-300
+                           transition-colors"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-slate-900 truncate">
+                      {item.title || 'Untitled'}
+                    </p>
+                    <a
+                      href={item.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-blue-600 hover:underline
+                                 truncate block"
+                    >
+                      {item.url}
+                    </a>
+                    <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                      {item.topic ? (
+                        <span className="text-[10px] bg-blue-100 text-blue-700
+                                         px-2 py-0.5 rounded-full font-medium">
+                          {item.topic}
+                        </span>
+                      ) : (
+                        <span className="text-[10px] bg-slate-100 text-slate-500
+                                         px-2 py-0.5 rounded-full">
+                          No topic
+                        </span>
+                      )}
+                      <span className="text-[10px] text-slate-400">
+                        {(item.word_count || 0).toLocaleString()} words
                       </span>
-                    )}
-                    <span className="text-[10px] text-slate-400">
-                      {(item.word_count || 0).toLocaleString()} words
-                    </span>
-                    <span className="text-[10px] text-slate-400">
-                      {item.scraped_at
-                        ? new Date(item.scraped_at).toLocaleDateString()
-                        : 'Just now'
-                      }
-                    </span>
-                    {item.is_indexed && (
-                      <span className="text-[10px] bg-green-100 text-green-700
-                                       px-2 py-0.5 rounded-full font-medium">
-                        ✓ Indexed
+                      <span className="text-[10px] text-slate-400">
+                        {item.scraped_at
+                          ? new Date(item.scraped_at).toLocaleDateString('en-US', {
+                              month:  'short',
+                              day:    'numeric',
+                              year:   'numeric',
+                              hour:   '2-digit',
+                              minute: '2-digit',
+                            })
+                          : 'Just now'
+                        }
                       </span>
-                    )}
+                      {item.is_indexed ? (
+                        <span className="text-[10px] bg-green-100 text-green-700
+                                         px-2 py-0.5 rounded-full font-medium">
+                          ✓ Indexed
+                        </span>
+                      ) : (
+                        <span className="text-[10px] bg-amber-50 text-amber-600
+                                         px-2 py-0.5 rounded-full">
+                          Pending
+                        </span>
+                      )}
+                    </div>
                   </div>
+                  <button
+                    onClick={() => handleDelete(item.id)}
+                    className="text-red-400 hover:text-red-600 text-xs
+                               shrink-0 transition-colors px-2 py-1
+                               hover:bg-red-50 rounded-lg font-medium"
+                  >
+                    Delete
+                  </button>
                 </div>
-                <button
-                  onClick={() => handleDelete(item.id)}
-                  className="text-red-400 hover:text-red-600 text-xs
-                             shrink-0 transition-colors font-medium"
-                >
-                  Delete
-                </button>
+
+                {/* Content preview */}
+                {item.content && (
+                  <div className="bg-slate-50 rounded-lg p-2.5
+                                  border border-slate-100">
+                    <p className="text-[11px] text-slate-500 line-clamp-2
+                                   leading-relaxed">
+                      {item.content.substring(0, 300)}…
+                    </p>
+                  </div>
+                )}
               </div>
-              {item.content && (
-                <p className="text-xs text-slate-500 line-clamp-2
-                               bg-slate-50 rounded-lg p-2">
-                  {item.content.substring(0, 200)}…
-                </p>
-              )}
-            </div>
-          ))
+            ))}
+          </div>
         )}
       </div>
     </div>
@@ -442,13 +750,18 @@ function BlogTab() {
     }
   }
 
+  const publishedCount = posts.filter(p => p.status === 'published').length
+  const pendingCount   = posts.filter(p => p.status === 'pending').length
+
   return (
     <div className="space-y-6">
+
+      {/* Header */}
       <div>
         <h2 className="text-lg font-semibold text-slate-900">Blog Management</h2>
         <p className="text-slate-500 text-sm mt-1">
-          Generate AI blog posts using Groq AI for text and Pollinations AI for
-          cover images. Review and publish from here.
+          Generate AI blog posts using Groq AI for text and Pollinations AI
+          for cover images. Review and publish from here.
         </p>
       </div>
 
@@ -457,6 +770,23 @@ function BlogTab() {
         onClearResult={() => setResult('')}
         onClearError={() => setError('')}
       />
+
+      {/* Stats */}
+      {posts.length > 0 && (
+        <div className="grid grid-cols-3 gap-3">
+          {[
+            { label: 'Total Posts',   value: posts.length,   color: 'text-blue-600'  },
+            { label: 'Published',     value: publishedCount, color: 'text-green-600' },
+            { label: 'Pending Review',value: pendingCount,   color: 'text-amber-600' },
+          ].map(({ label, value, color }) => (
+            <div key={label}
+                 className="bg-white border border-slate-200 rounded-xl p-3 text-center">
+              <p className={`text-xl font-black ${color}`}>{value}</p>
+              <p className="text-xs text-slate-500 mt-0.5">{label}</p>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Generate */}
       <div className="bg-white border border-slate-200 rounded-xl p-5 space-y-4">
@@ -487,13 +817,13 @@ function BlogTab() {
           </button>
         </div>
         <p className="text-xs text-slate-400">
-          Groq AI writes the article • Pollinations AI generates the cover image •
-          Post saved as draft for your review
+          Groq AI writes the article • Pollinations AI generates the cover image
+          • Post saved as draft for your review before publishing
         </p>
       </div>
 
-      {/* Filter */}
-      <div className="flex gap-2 flex-wrap">
+      {/* Filter tabs */}
+      <div className="flex gap-2 flex-wrap items-center">
         {['all', 'pending', 'published'].map(f => (
           <button
             key={f}
@@ -506,6 +836,12 @@ function BlogTab() {
               }`}
           >
             {f}
+            {f === 'pending'   && pendingCount   > 0 && (
+              <span className="ml-1 bg-amber-500 text-white text-[9px]
+                               px-1.5 py-0.5 rounded-full">
+                {pendingCount}
+              </span>
+            )}
           </button>
         ))}
         <button
@@ -527,7 +863,7 @@ function BlogTab() {
         <div className="bg-white border border-slate-200 rounded-xl
                         text-center py-12 space-y-2">
           <p className="text-4xl">📰</p>
-          <p className="text-slate-500 text-sm">
+          <p className="text-slate-500 text-sm font-medium">
             {filter === 'all'
               ? 'No blog posts yet. Generate one above.'
               : `No ${filter} posts.`
@@ -537,9 +873,11 @@ function BlogTab() {
       ) : (
         <div className="space-y-4">
           {posts.map(post => (
-            <div key={post.id}
-                 className="bg-white border border-slate-200 rounded-xl
-                             overflow-hidden">
+            <div
+              key={post.id}
+              className="bg-white border border-slate-200 rounded-xl
+                         overflow-hidden hover:border-slate-300 transition-colors"
+            >
               {/* Cover image */}
               {post.image_url && (
                 <div className="w-full h-32 bg-slate-100 overflow-hidden">
@@ -553,14 +891,14 @@ function BlogTab() {
               )}
 
               <div className="p-4 space-y-3">
-                {/* Status + topic */}
+                {/* Status + topic + meta */}
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className={`text-xs px-2 py-0.5 rounded-full font-medium
                     ${post.status === 'published'
                       ? 'bg-green-100 text-green-700'
                       : 'bg-amber-100 text-amber-700'
                     }`}>
-                    {post.status}
+                    {post.status === 'published' ? '✅ Published' : '⏳ Pending'}
                   </span>
                   {post.topic && (
                     <span className="text-xs px-2 py-0.5 bg-blue-100
@@ -581,13 +919,14 @@ function BlogTab() {
 
                 {/* Excerpt */}
                 {post.excerpt && (
-                  <p className="text-xs text-slate-500 line-clamp-2">
+                  <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed">
                     {post.excerpt}
                   </p>
                 )}
 
-                {/* Dates */}
-                <div className="flex items-center gap-3 text-[10px] text-slate-400 flex-wrap">
+                {/* Dates + AI model */}
+                <div className="flex items-center gap-3 text-[10px]
+                                text-slate-400 flex-wrap">
                   <span>
                     Created: {new Date(post.created_at).toLocaleDateString()}
                   </span>
@@ -599,8 +938,8 @@ function BlogTab() {
                   {post.views > 0 && (
                     <span>{post.views.toLocaleString()} views</span>
                   )}
-                  <span className="text-[10px] text-slate-300">
-                    AI: {post.ai_model || 'groq+pollinations'}
+                  <span className="text-slate-300">
+                    {post.ai_model || 'groq+pollinations'}
                   </span>
                 </div>
 
@@ -609,16 +948,16 @@ function BlogTab() {
                   {post.status !== 'published' ? (
                     <button
                       onClick={() => handleApprove(post.id)}
-                      className="flex-1 py-1.5 text-xs font-bold bg-green-600
+                      className="flex-1 py-2 text-xs font-bold bg-green-600
                                  text-white rounded-lg hover:bg-green-700
                                  transition-colors"
                     >
-                      ✅ Publish
+                      ✅ Publish Now
                     </button>
                   ) : (
                     <button
                       onClick={() => handleUnpublish(post.id)}
-                      className="flex-1 py-1.5 text-xs font-medium bg-slate-100
+                      className="flex-1 py-2 text-xs font-medium bg-slate-100
                                  text-slate-600 rounded-lg hover:bg-slate-200
                                  transition-colors"
                     >
@@ -629,7 +968,7 @@ function BlogTab() {
                     href={`/blog/${post.slug}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex-1 py-1.5 text-xs font-medium text-center
+                    className="flex-1 py-2 text-xs font-medium text-center
                                border border-slate-200 text-slate-600 rounded-lg
                                hover:bg-slate-50 transition-colors"
                   >
@@ -637,7 +976,7 @@ function BlogTab() {
                   </a>
                   <button
                     onClick={() => handleDelete(post.id)}
-                    className="px-3 py-1.5 text-xs text-red-600
+                    className="px-3 py-2 text-xs text-red-500
                                hover:bg-red-50 rounded-lg transition-colors"
                   >
                     Delete
@@ -677,7 +1016,7 @@ function UsersTab() {
           .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1),
       ])
       if (profilesRes.error) throw profilesRes.error
-      setUsersList(profilesRes.data  || [])
+      setUsersList(profilesRes.data   || [])
       setAttemptsList(attemptsRes.data || [])
     } catch (err) {
       setError(err.message)
@@ -706,14 +1045,18 @@ function UsersTab() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-semibold text-slate-900">Users & Activity</h2>
+          <h2 className="text-lg font-semibold text-slate-900">
+            Users & Activity
+          </h2>
           <p className="text-slate-500 text-sm mt-0.5">
             Monitor student registrations and exam attempts.
           </p>
         </div>
-        <button onClick={load}
-                className="px-4 py-2 text-sm border border-slate-200
-                           rounded-xl hover:bg-slate-50 transition-colors">
+        <button
+          onClick={load}
+          className="px-4 py-2 text-sm border border-slate-200
+                     rounded-xl hover:bg-slate-50 transition-colors"
+        >
           ↻ Refresh
         </button>
       </div>
@@ -721,9 +1064,9 @@ function UsersTab() {
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {[
-          { label: 'Synced Users',   value: usersList.length                              },
-          { label: 'Attempts',       value: attemptsList.length                           },
-          { label: 'Correct',        value: attemptsList.filter(a => a.is_correct).length },
+          { label: 'Synced Users',  value: usersList.length                               },
+          { label: 'Attempts',      value: attemptsList.length                            },
+          { label: 'Correct',       value: attemptsList.filter(a => a.is_correct).length  },
           {
             label: 'Accuracy',
             value: attemptsList.length
@@ -750,11 +1093,14 @@ function UsersTab() {
           <LoadingSpinner size="lg" text="Loading users..." />
         </div>
       ) : error ? (
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-6 space-y-4">
+        <div className="bg-amber-50 border border-amber-200 rounded-xl
+                        p-6 space-y-4">
           <div className="flex items-start gap-3">
             <span className="text-xl">💡</span>
             <div>
-              <h4 className="font-semibold text-amber-900">Profiles table setup needed</h4>
+              <h4 className="font-semibold text-amber-900">
+                Profiles table setup needed
+              </h4>
               <p className="text-amber-800 text-sm mt-1">
                 Run this SQL in your Supabase SQL Editor:
               </p>
@@ -780,22 +1126,25 @@ function UsersTab() {
             <tbody className="divide-y divide-slate-100 text-slate-600">
               {combinedUsers.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="px-4 py-8 text-center text-slate-400 text-sm">
+                  <td colSpan={4}
+                      className="px-4 py-8 text-center text-slate-400 text-sm">
                     No users yet. When users sign up they will appear here.
                   </td>
                 </tr>
               ) : (
                 combinedUsers.map(usr => (
-                  <tr key={usr.id} className="hover:bg-slate-50 transition-colors">
+                  <tr key={usr.id}
+                      className="hover:bg-slate-50 transition-colors">
                     <td className="px-4 py-3 font-medium text-slate-900">
                       {usr.email || 'Anonymous'}
                     </td>
-                    <td className="px-4 py-3 font-mono text-xs text-slate-400 select-all">
+                    <td className="px-4 py-3 font-mono text-xs
+                                   text-slate-400 select-all">
                       {usr.id}
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded
-                        text-xs font-medium
+                      <span className={`inline-flex items-center px-2 py-0.5
+                        rounded text-xs font-medium
                         ${usr.isSynthetic
                           ? 'bg-amber-50 text-amber-800 border border-amber-100'
                           : 'bg-green-50 text-green-800 border border-green-100'
@@ -849,8 +1198,10 @@ function UsersTab() {
           </h3>
           {attemptsList.slice(0, 10).map(attempt => (
             <div key={attempt.id}
-                 className="bg-white border border-slate-200 rounded-xl p-4 space-y-2">
-              <div className="flex flex-wrap items-center justify-between gap-2">
+                 className="bg-white border border-slate-200 rounded-xl
+                             p-4 space-y-2">
+              <div className="flex flex-wrap items-center
+                              justify-between gap-2">
                 <span className="text-xs font-semibold px-2 py-0.5
                                  bg-blue-50 text-blue-700 rounded-full">
                   {attempt.topic}
@@ -865,8 +1216,8 @@ function UsersTab() {
                   </span>
                 </div>
               </div>
-              <p className="text-sm text-slate-700 bg-slate-50 rounded-lg
-                             p-2 line-clamp-2 text-xs">
+              <p className="text-xs text-slate-600 bg-slate-50 rounded-lg
+                             p-2 line-clamp-2">
                 {attempt.question}
               </p>
             </div>
@@ -879,7 +1230,7 @@ function UsersTab() {
 
 // ── Main Admin component ──────────────────────────────────────────────────────
 export default function Admin() {
-  const navigate   = useNavigate()
+  const navigate    = useNavigate()
   const [activeTab, setActiveTab] = useState('videos')
   const [loading,   setLoading]   = useState(false)
   const [result,    setResult]    = useState('')
@@ -1038,14 +1389,13 @@ export default function Admin() {
     }
   }
 
-  // ── Delete module ──────────────────────────────────────────────────────────
+  // ── Module actions ─────────────────────────────────────────────────────────
   const handleDeleteModule = async (id) => {
     if (!window.confirm('Delete this module?')) return
     await supabase.from('course_modules').delete().eq('id', id)
     setModules(m => m.filter(mod => mod.id !== id))
   }
 
-  // ── Toggle module publish ──────────────────────────────────────────────────
   const handleTogglePublish = async (id, current) => {
     await supabase
       .from('course_modules')
@@ -1079,13 +1429,15 @@ export default function Admin() {
       </div>
 
       {/* ── Tabs — desktop ── */}
-      <div className="hidden sm:flex gap-1 bg-slate-100 p-1 rounded-xl overflow-x-auto">
+      <div className="hidden sm:flex gap-1 bg-slate-100 p-1 rounded-xl
+                      overflow-x-auto">
         {TABS.map(({ id, label, icon }) => (
           <button
             key={id}
             onClick={() => { setActiveTab(id); clear() }}
-            className={`px-3 py-2 rounded-lg text-xs font-medium whitespace-nowrap
-              transition-colors flex-1 flex items-center justify-center gap-1.5
+            className={`px-3 py-2 rounded-lg text-xs font-medium
+              whitespace-nowrap transition-colors flex-1
+              flex items-center justify-center gap-1.5
               ${activeTab === id
                 ? 'bg-white text-blue-600 shadow-sm'
                 : 'text-slate-600 hover:text-slate-900'
@@ -1112,7 +1464,7 @@ export default function Admin() {
         </select>
       </div>
 
-      {/* ── Global feedback (for video/web/pdf tabs) ── */}
+      {/* ── Global feedback for video/web/pdf tabs ── */}
       {['videos', 'web', 'pdf'].includes(activeTab) && (
         <Feedback
           result={result} error={error}
@@ -1127,9 +1479,11 @@ export default function Admin() {
       {activeTab === 'videos' && (
         <div className="bg-white border border-slate-200 rounded-xl p-6 space-y-5">
           <div>
-            <h2 className="text-lg font-semibold text-slate-900">Add YouTube Lecture</h2>
+            <h2 className="text-lg font-semibold text-slate-900">
+              Add YouTube Lecture
+            </h2>
             <p className="text-slate-500 text-sm mt-1">
-              AI extracts transcript → summary → outline → indexes for chat.
+              AI extracts transcript → generates summary + outline → indexes for chat.
             </p>
           </div>
 
@@ -1198,7 +1552,8 @@ export default function Admin() {
             </button>
           </form>
 
-          <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-2">
+          <div className="bg-slate-50 border border-slate-200 rounded-xl
+                          p-4 space-y-2">
             <p className="text-sm font-semibold text-slate-700">
               ⚙️ What happens automatically:
             </p>
@@ -1219,9 +1574,12 @@ export default function Admin() {
       {activeTab === 'web' && (
         <div className="bg-white border border-slate-200 rounded-xl p-6 space-y-5">
           <div>
-            <h2 className="text-lg font-semibold text-slate-900">Scrape Web Page</h2>
+            <h2 className="text-lg font-semibold text-slate-900">
+              Scrape Web Page (AI Knowledge Base)
+            </h2>
             <p className="text-slate-500 text-sm mt-1">
-              Add bar prep websites to the AI knowledge base via ingest-url.
+              Add bar prep websites directly to the AI knowledge base via ingest-url.
+              Different from the Scraper tab which saves to the scraped_data table.
             </p>
           </div>
 
@@ -1245,24 +1603,27 @@ export default function Admin() {
                          flex items-center justify-center gap-2 min-h-[48px]"
             >
               {loading
-                ? <><LoadingSpinner size="sm" color="white" /> Scraping…</>
-                : 'Add Web Page →'
+                ? <><LoadingSpinner size="sm" color="white" /> Ingesting…</>
+                : 'Add to AI Knowledge Base →'
               }
             </button>
           </form>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-            {QUICK_ADD_URLS.slice(0, 12).map(({ label, url }) => (
-              <button
-                key={label + url}
-                onClick={() => setPageUrl(url)}
-                className="p-2 text-left text-xs bg-slate-50 border border-slate-200
-                           rounded-lg hover:bg-blue-50 hover:border-blue-300
-                           text-slate-600 hover:text-blue-700 transition-colors"
-              >
-                📄 {label}
-              </button>
-            ))}
+            {QUICK_ADD_URLS
+              .filter(u => u.url.includes('cornell.edu'))
+              .slice(0, 18)
+              .map(({ label, url }) => (
+                <button
+                  key={label + url}
+                  onClick={() => setPageUrl(url)}
+                  className="p-2 text-left text-xs bg-slate-50 border border-slate-200
+                             rounded-lg hover:bg-blue-50 hover:border-blue-300
+                             text-slate-600 hover:text-blue-700 transition-colors"
+                >
+                  📄 {label}
+                </button>
+              ))}
           </div>
         </div>
       )}
@@ -1273,7 +1634,9 @@ export default function Admin() {
       {activeTab === 'pdf' && (
         <div className="bg-white border border-slate-200 rounded-xl p-6 space-y-5">
           <div>
-            <h2 className="text-lg font-semibold text-slate-900">Upload Study Document</h2>
+            <h2 className="text-lg font-semibold text-slate-900">
+              Upload Study Document
+            </h2>
             <p className="text-slate-500 text-sm mt-1">
               Upload PDFs, notes, or guides. AI reads and indexes them.
             </p>
@@ -1377,7 +1740,7 @@ export default function Admin() {
                           ? 'bg-green-100 text-green-700'
                           : 'bg-slate-100 text-slate-600'
                         }`}>
-                        {module.is_published ? 'Published' : 'Draft'}
+                        {module.is_published ? '✅ Published' : 'Draft'}
                       </span>
                     </div>
                     <h3 className="font-medium text-slate-900 text-sm truncate">
@@ -1390,7 +1753,9 @@ export default function Admin() {
 
                   <div className="flex flex-col gap-1 shrink-0">
                     <button
-                      onClick={() => handleTogglePublish(module.id, module.is_published)}
+                      onClick={() =>
+                        handleTogglePublish(module.id, module.is_published)
+                      }
                       className={`px-3 py-1 text-xs font-medium rounded-lg
                         transition-colors
                         ${module.is_published
@@ -1475,12 +1840,14 @@ export default function Admin() {
               <div className="flex items-start gap-3">
                 <span className="text-xl">💡</span>
                 <div>
-                  <h4 className="font-semibold text-amber-900">Backend support needed</h4>
+                  <h4 className="font-semibold text-amber-900">
+                    Backend support needed
+                  </h4>
                   <p className="text-amber-800 text-sm mt-1">{chatsError}</p>
                   <p className="text-amber-700 text-xs mt-2">
-                    The chat-sessions Edge Function needs an admin_list action that
-                    verifies the admin token and returns all sessions using the
-                    service-role key.
+                    The chat-sessions Edge Function needs an admin_list action
+                    that verifies the admin token and returns all sessions using
+                    the service-role key.
                   </p>
                 </div>
               </div>
@@ -1488,7 +1855,9 @@ export default function Admin() {
           ) : chatSessions.length === 0 ? (
             <div className="bg-white border border-slate-200 rounded-xl
                             text-center py-12">
-              <p className="text-slate-500 text-sm">No chat sessions saved yet.</p>
+              <p className="text-slate-500 text-sm">
+                No chat sessions saved yet.
+              </p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -1502,8 +1871,8 @@ export default function Admin() {
                       onClick={() =>
                         setExpandedSession(isOpen ? null : session.id)
                       }
-                      className="w-full flex items-center justify-between gap-3
-                                 px-5 py-4 text-left hover:bg-slate-50
+                      className="w-full flex items-center justify-between
+                                 gap-3 px-5 py-4 text-left hover:bg-slate-50
                                  transition-colors"
                     >
                       <div className="min-w-0">
@@ -1534,11 +1903,13 @@ export default function Admin() {
                           <div
                             key={i}
                             className={`flex ${
-                              msg.role === 'user' ? 'justify-end' : 'justify-start'
+                              msg.role === 'user'
+                                ? 'justify-end'
+                                : 'justify-start'
                             }`}
                           >
-                            <div className={`max-w-[85%] rounded-xl px-3 py-2
-                              text-sm
+                            <div className={`max-w-[85%] rounded-xl px-3
+                              py-2 text-sm
                               ${msg.role === 'user'
                                 ? 'bg-blue-600 text-white'
                                 : 'bg-white border border-slate-200 text-slate-800'

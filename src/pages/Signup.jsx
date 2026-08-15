@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Link, useNavigate, useLocation } from 'react-router-dom'
-import { supabase }       from '../api/client'
-import LoadingSpinner     from '../components/LoadingSpinner'
+import { Link, useNavigate, useLocation }   from 'react-router-dom'
+import { supabase }                         from '../api/client'
+import LoadingSpinner                       from '../components/LoadingSpinner'
 
 // ── Password strength ─────────────────────────────────────────────────────────
 const STRENGTH_MAP = {
@@ -30,12 +30,14 @@ function friendlyError(msg = '') {
     return 'Please enter a valid email address.'
   if (msg.includes('Password should be'))
     return 'Password must be at least 6 characters.'
+  if (msg.includes('Database error'))
+    return 'Account created but profile setup had an issue. Please try signing in.'
   if (msg.includes('network') || msg.includes('fetch'))
-    return 'Network error. Please check your connection.'
+    return 'Network error. Please check your connection and try again.'
   return msg || 'Sign up failed. Please try again.'
 }
 
-// ── Resend confirmation email ─────────────────────────────────────────────────
+// ── Resend confirmation ───────────────────────────────────────────────────────
 async function resendConfirmation(email) {
   const { error } = await supabase.auth.resend({
     type:  'signup',
@@ -49,35 +51,31 @@ export default function Signup() {
   const navigate = useNavigate()
   const location = useLocation()
 
-  // Preserve redirect destination from PrivateRoute
   const from = location.state?.from || '/chat'
 
-  const [email,        setEmail]        = useState('')
-  const [password,     setPassword]     = useState('')
-  const [confirmPass,  setConfirmPass]  = useState('')
-  const [fullName,     setFullName]     = useState('')
-  const [loading,      setLoading]      = useState(false)
-  const [error,        setError]        = useState('')
-  const [success,      setSuccess]      = useState(false)
-  const [showPass,     setShowPass]     = useState(false)
-  const [showConfirm,  setShowConfirm]  = useState(false)
-  const [agreed,       setAgreed]       = useState(false)
-  const [resending,    setResending]    = useState(false)
-  const [resendSent,   setResendSent]   = useState(false)
+  const [email,       setEmail]       = useState('')
+  const [password,    setPassword]    = useState('')
+  const [confirmPass, setConfirmPass] = useState('')
+  const [fullName,    setFullName]    = useState('')
+  const [loading,     setLoading]     = useState(false)
+  const [error,       setError]       = useState('')
+  const [success,     setSuccess]     = useState(false)
+  const [showPass,    setShowPass]    = useState(false)
+  const [showConfirm, setShowConfirm] = useState(false)
+  const [agreed,      setAgreed]      = useState(false)
+  const [resending,   setResending]   = useState(false)
+  const [resendSent,  setResendSent]  = useState(false)
 
   const strength = getStrength(password)
 
-  // SEO
   useEffect(() => {
     document.title = 'Create Account — BarPrep AI'
   }, [])
 
-  // Clear error on any field change
   const clearError = useCallback(() => {
     if (error) setError('')
   }, [error])
 
-  // ── Validate ───────────────────────────────────────────────────────────────
   const validate = useCallback(() => {
     if (!fullName.trim())
       return 'Please enter your full name.'
@@ -101,35 +99,30 @@ export default function Signup() {
     if (validationError) { setError(validationError); return }
 
     setLoading(true)
+
     try {
-      const { error: authErr } = await supabase.auth.signUp({
+      const { data, error: authErr } = await supabase.auth.signUp({
         email:    email.trim().toLowerCase(),
         password,
         options: {
-          data: { full_name: fullName.trim() },
-          // Sync full_name to profiles table via Supabase trigger
+          data: {
+            full_name: fullName.trim(),
+          },
         },
       })
+
       if (authErr) throw authErr
 
-      // Also upsert profile with full_name
-      // (handles cases where trigger doesn't capture metadata)
-      try {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (user) {
-          await supabase.from('profiles').upsert({
-            id:         user.id,
-            email:      user.email,
-            full_name:  fullName.trim(),
-            created_at: new Date().toISOString(),
-          }, { onConflict: 'id' })
-        }
-      } catch {
-        // Silent - profile sync is non-critical
+      // Check if user was actually created
+      if (!data?.user) {
+        throw new Error('Failed to create account. Please try again.')
       }
 
+      // Success — trigger handles profile creation automatically
       setSuccess(true)
+
     } catch (err) {
+      console.error('Signup error:', err)
       setError(friendlyError(err.message))
     } finally {
       setLoading(false)
@@ -147,14 +140,12 @@ export default function Signup() {
   // ── Success screen ─────────────────────────────────────────────────────────
   if (success) {
     return (
-      <div className="min-h-[80vh] flex items-center
-                      justify-center px-4 py-12">
+      <div className="min-h-[80vh] flex items-center justify-center px-4 py-12">
         <div className="w-full max-w-md text-center space-y-6">
           <div className="bg-white border border-slate-200 rounded-3xl
                           p-10 shadow-xl shadow-slate-100 space-y-6">
             <div className="w-20 h-20 bg-green-100 rounded-full
-                            flex items-center justify-center
-                            mx-auto text-4xl">
+                            flex items-center justify-center mx-auto text-4xl">
               📧
             </div>
             <div className="space-y-2">
@@ -168,10 +159,9 @@ export default function Signup() {
               </p>
             </div>
 
-            <div className="bg-blue-50 border border-blue-200
-                            rounded-2xl p-4 text-left space-y-2">
-              <p className="text-xs font-bold text-blue-800 uppercase
-                            tracking-wide">
+            <div className="bg-blue-50 border border-blue-200 rounded-2xl
+                            p-4 text-left space-y-2">
+              <p className="text-xs font-bold text-blue-800 uppercase tracking-wide">
                 What to do next:
               </p>
               {[
@@ -184,19 +174,16 @@ export default function Signup() {
               ))}
             </div>
 
-            {/* Go to login — passes from state */}
             <Link
               to="/login"
               state={{ from }}
-              className="block w-full py-4 bg-blue-600 text-white
-                         font-black text-base rounded-2xl
-                         hover:bg-blue-700 transition-all
+              className="block w-full py-4 bg-blue-600 text-white font-black
+                         text-base rounded-2xl hover:bg-blue-700 transition-all
                          hover:-translate-y-0.5 text-center"
             >
               Go to Login →
             </Link>
 
-            {/* Resend */}
             <p className="text-xs text-slate-400">
               Didn't receive it? Check spam or{' '}
               {resendSent ? (
@@ -222,16 +209,14 @@ export default function Signup() {
 
   // ── Signup form ────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-[80vh] flex items-center
-                    justify-center px-4 py-12">
+    <div className="min-h-[80vh] flex items-center justify-center px-4 py-12">
       <div className="w-full max-w-md space-y-8">
 
-        {/* ── Header ── */}
+        {/* Header */}
         <div className="text-center space-y-3">
-          <Link to="/" className="inline-flex items-center
-                                   justify-center gap-2 mb-2">
-            <div className="w-10 h-10 bg-blue-600 rounded-xl
-                            flex items-center justify-center shadow-lg">
+          <Link to="/" className="inline-flex items-center justify-center gap-2 mb-2">
+            <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center
+                            justify-center shadow-lg">
               <span className="text-white font-black text-lg">B</span>
             </div>
             <span className="font-black text-slate-900 text-xl">
@@ -246,36 +231,33 @@ export default function Signup() {
           </p>
         </div>
 
-        {/* ── Free plan badge ── */}
-        <div className="bg-green-50 border border-green-200
-                        rounded-2xl p-4 flex items-center gap-3">
+        {/* Free plan badge */}
+        <div className="bg-green-50 border border-green-200 rounded-2xl
+                        p-4 flex items-center gap-3">
           <span className="text-2xl">🎉</span>
           <div>
-            <p className="text-sm font-bold text-green-800">
-              Free Plan Included
-            </p>
+            <p className="text-sm font-bold text-green-800">Free Plan Included</p>
             <p className="text-xs text-green-600">
-              AI coaching + mock exams + blog access — forever free.
-              Upgrade anytime.
+              10 AI messages/day + 5 mock questions/day — forever free.
+              Upgrade to Pro ($100/mo) or Bar Ready ($400/yr) anytime.
             </p>
           </div>
         </div>
 
-        {/* ── Card ── */}
+        {/* Card */}
         <div className="bg-white border border-slate-200 rounded-3xl
                         p-8 shadow-xl shadow-slate-100 space-y-6">
 
           {/* Error */}
           {error && (
-            <div className="p-4 bg-red-50 border border-red-200
-                            rounded-2xl flex items-start gap-3">
+            <div className="p-4 bg-red-50 border border-red-200 rounded-2xl
+                            flex items-start gap-3">
               <span className="text-red-500 text-lg shrink-0">❌</span>
               <div>
                 <p className="text-red-800 text-sm font-semibold">
                   Please fix the following
                 </p>
                 <p className="text-red-600 text-xs mt-0.5">{error}</p>
-                {/* If email already exists, offer to go to login */}
                 {error.includes('already exists') && (
                   <Link
                     to="/login"
@@ -306,12 +288,10 @@ export default function Signup() {
                 required
                 disabled={loading}
                 autoComplete="name"
-                className="w-full px-4 py-3.5 bg-slate-50 border
-                           border-slate-200 rounded-2xl text-sm
-                           text-slate-900 placeholder-slate-400
-                           focus:outline-none focus:ring-2
-                           focus:ring-blue-500 focus:border-transparent
-                           transition-all disabled:opacity-60"
+                className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200
+                           rounded-2xl text-sm text-slate-900 placeholder-slate-400
+                           focus:outline-none focus:ring-2 focus:ring-blue-500
+                           focus:border-transparent transition-all disabled:opacity-60"
               />
             </div>
 
@@ -329,12 +309,10 @@ export default function Signup() {
                 required
                 disabled={loading}
                 autoComplete="email"
-                className="w-full px-4 py-3.5 bg-slate-50 border
-                           border-slate-200 rounded-2xl text-sm
-                           text-slate-900 placeholder-slate-400
-                           focus:outline-none focus:ring-2
-                           focus:ring-blue-500 focus:border-transparent
-                           transition-all disabled:opacity-60"
+                className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200
+                           rounded-2xl text-sm text-slate-900 placeholder-slate-400
+                           focus:outline-none focus:ring-2 focus:ring-blue-500
+                           focus:border-transparent transition-all disabled:opacity-60"
               />
             </div>
 
@@ -353,20 +331,17 @@ export default function Signup() {
                   required
                   disabled={loading}
                   autoComplete="new-password"
-                  className="w-full px-4 py-3.5 bg-slate-50 border
-                             border-slate-200 rounded-2xl text-sm
-                             text-slate-900 placeholder-slate-400
-                             focus:outline-none focus:ring-2
-                             focus:ring-blue-500 focus:border-transparent
-                             transition-all disabled:opacity-60 pr-12"
+                  className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200
+                             rounded-2xl text-sm text-slate-900 placeholder-slate-400
+                             focus:outline-none focus:ring-2 focus:ring-blue-500
+                             focus:border-transparent transition-all disabled:opacity-60 pr-12"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPass(s => !s)}
                   aria-label={showPass ? 'Hide password' : 'Show password'}
                   className="absolute right-4 top-1/2 -translate-y-1/2
-                             text-slate-400 hover:text-slate-600
-                             transition-colors text-sm"
+                             text-slate-400 hover:text-slate-600 transition-colors"
                 >
                   {showPass ? '🙈' : '👁️'}
                 </button>
@@ -379,12 +354,8 @@ export default function Signup() {
                     {[1, 2, 3, 4].map(i => (
                       <div
                         key={i}
-                        className={`h-1.5 flex-1 rounded-full transition-all
-                          duration-300
-                          ${i <= strength.score
-                            ? strength.color
-                            : 'bg-slate-200'
-                          }`}
+                        className={`h-1.5 flex-1 rounded-full transition-all duration-300
+                          ${i <= strength.score ? strength.color : 'bg-slate-200'}`}
                       />
                     ))}
                   </div>
@@ -399,7 +370,7 @@ export default function Signup() {
                     </p>
                   )}
                   <p className="text-[10px] text-slate-400">
-                    Tip: Use uppercase, numbers, and symbols for a strong password
+                    Tip: Use uppercase, numbers, and symbols
                   </p>
                 </div>
               )}
@@ -421,10 +392,10 @@ export default function Signup() {
                   disabled={loading}
                   autoComplete="new-password"
                   className={`
-                    w-full px-4 py-3.5 bg-slate-50 border rounded-2xl
-                    text-sm text-slate-900 placeholder-slate-400
-                    focus:outline-none focus:ring-2 focus:border-transparent
-                    transition-all disabled:opacity-60 pr-12
+                    w-full px-4 py-3.5 bg-slate-50 border rounded-2xl text-sm
+                    text-slate-900 placeholder-slate-400 focus:outline-none
+                    focus:ring-2 focus:border-transparent transition-all
+                    disabled:opacity-60 pr-12
                     ${confirmPass && password !== confirmPass
                       ? 'border-red-300 focus:ring-red-400'
                       : confirmPass && password === confirmPass
@@ -438,14 +409,12 @@ export default function Signup() {
                   onClick={() => setShowConfirm(s => !s)}
                   aria-label={showConfirm ? 'Hide password' : 'Show password'}
                   className="absolute right-4 top-1/2 -translate-y-1/2
-                             text-slate-400 hover:text-slate-600
-                             transition-colors text-sm"
+                             text-slate-400 hover:text-slate-600 transition-colors"
                 >
                   {showConfirm ? '🙈' : '👁️'}
                 </button>
                 {confirmPass && (
-                  <span className="absolute right-10 top-1/2
-                                   -translate-y-1/2 text-sm">
+                  <span className="absolute right-10 top-1/2 -translate-y-1/2 text-sm">
                     {password === confirmPass ? '✅' : '❌'}
                   </span>
                 )}
@@ -470,9 +439,8 @@ export default function Signup() {
                 id="agree"
                 checked={agreed}
                 onChange={e => { setAgreed(e.target.checked); clearError() }}
-                className="mt-0.5 w-4 h-4 text-blue-600 rounded
-                           border-slate-300 focus:ring-blue-500
-                           cursor-pointer shrink-0"
+                className="mt-0.5 w-4 h-4 text-blue-600 rounded border-slate-300
+                           focus:ring-blue-500 cursor-pointer shrink-0"
               />
               <label
                 htmlFor="agree"
@@ -488,8 +456,8 @@ export default function Signup() {
                       className="text-blue-600 hover:underline font-semibold">
                   Privacy Policy
                 </Link>
-                . I understand BarPrep AI is an educational tool and not
-                a substitute for accredited bar prep courses.
+                . I understand BarPrep AI is an educational tool and not a
+                substitute for accredited bar prep courses.
               </label>
             </div>
 
@@ -503,10 +471,9 @@ export default function Signup() {
               }
               className="w-full py-4 bg-blue-600 text-white font-black
                          text-base rounded-2xl hover:bg-blue-700
-                         transition-all duration-200 shadow-lg
-                         shadow-blue-200 hover:-translate-y-0.5
-                         active:scale-[0.98] disabled:opacity-60
-                         disabled:cursor-not-allowed
+                         transition-all duration-200 shadow-lg shadow-blue-200
+                         hover:-translate-y-0.5 active:scale-[0.98]
+                         disabled:opacity-60 disabled:cursor-not-allowed
                          disabled:hover:translate-y-0
                          flex items-center justify-center gap-2"
             >
@@ -537,52 +504,47 @@ export default function Signup() {
             className="block w-full py-4 border-2 border-slate-200
                        text-slate-700 font-black text-base rounded-2xl
                        hover:border-blue-300 hover:text-blue-600
-                       hover:bg-blue-50 transition-all duration-200
-                       text-center"
+                       hover:bg-blue-50 transition-all duration-200 text-center"
           >
             Sign In Instead
           </Link>
 
         </div>
 
-        {/* ── What you get ── */}
-        <div className="bg-white border border-slate-200 rounded-2xl
-                        p-5 space-y-3">
-          <p className="text-xs font-bold text-slate-500 uppercase
-                        tracking-wide text-center">
+        {/* What you get */}
+        <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-3">
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-wide text-center">
             What you get for free
           </p>
           <div className="grid grid-cols-2 gap-2">
             {[
-              { icon: '🤖', text: 'AI Coach' },
-              { icon: '📝', text: 'Mock Exams'     },
-              { icon: '📊', text: 'Progress Tracking' },
-              { icon: '🎥', text: 'Video Tutorials' },
-              { icon: '📰', text: 'Blog Access' },  // ← NEW
-              { icon: '📅', text: 'Study Planning'  },
+              { icon: '🤖', text: 'AI Coach — 10 msg/day'    },
+              { icon: '📝', text: 'Mock Exam — 5 q/day'      },
+              { icon: '📊', text: 'Progress tracking'        },
+              { icon: '🎥', text: 'Video tutorials'          },
+              { icon: '📰', text: 'Blog access'              },
+              { icon: '📅', text: 'Study planning'           },
             ].map(({ icon, text }) => (
-              <div
-                key={text}
-                className="flex items-center gap-2 p-2 bg-slate-50 rounded-xl"
-              >
+              <div key={text}
+                   className="flex items-center gap-2 p-2 bg-slate-50 rounded-xl">
                 <span className="text-base">{icon}</span>
                 <span className="text-xs text-slate-600 font-medium">{text}</span>
               </div>
             ))}
           </div>
           <div className="text-center pt-1">
-            <a
-              href="/#pricing"
+            <Link
+              to="/pricing"
               className="text-xs text-blue-600 hover:underline font-semibold"
             >
-              See Pro plan ($90/mo) →
-            </a>
+              See Pro ($100/mo) and Bar Ready ($400/yr) →
+            </Link>
           </div>
         </div>
 
-        {/* ── Trust signals ── */}
-        <div className="flex items-center justify-center gap-6
-                        flex-wrap text-slate-400 text-xs">
+        {/* Trust signals */}
+        <div className="flex items-center justify-center gap-6 flex-wrap
+                        text-slate-400 text-xs">
           {[
             '🔒 Secure & encrypted',
             '✅ No credit card',
@@ -592,7 +554,7 @@ export default function Signup() {
           ))}
         </div>
 
-        {/* ── Back to home ── */}
+        {/* Back to home */}
         <div className="text-center">
           <Link
             to="/"

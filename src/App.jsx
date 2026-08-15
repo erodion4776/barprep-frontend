@@ -114,16 +114,16 @@ export default function App() {
           <Routes>
 
             {/* ════════════════════════════════════════
-                PUBLIC ROUTES
+                PUBLIC ROUTES — No login required
             ════════════════════════════════════════ */}
 
-            {/* Landing — full width marketing page */}
+            {/* Landing page */}
             <Route
               path="/"
               element={<LandingPage />}
             />
 
-            {/* Auth routes */}
+            {/* Auth */}
             <Route
               path="/login"
               element={
@@ -149,7 +149,7 @@ export default function App() {
               }
             />
 
-            {/* Pricing — public */}
+            {/* Pricing */}
             <Route
               path="/pricing"
               element={
@@ -159,7 +159,7 @@ export default function App() {
               }
             />
 
-            {/* Payment success — public */}
+            {/* Payment success */}
             <Route
               path="/payment-success"
               element={
@@ -187,7 +187,7 @@ export default function App() {
               }
             />
 
-            {/* Tutorials list — public browsing */}
+            {/* ── TUTORIALS — Videos are FREE, no login needed ── */}
             <Route
               path="/tutorials"
               element={
@@ -196,8 +196,17 @@ export default function App() {
                 </PageWrapper>
               }
             />
+            {/* Video detail is PUBLIC — AI chat inside is gated by plan */}
+            <Route
+              path="/tutorials/:id"
+              element={
+                <PageWrapper>
+                  <ModuleDetail />
+                </PageWrapper>
+              }
+            />
 
-            {/* Info pages — public */}
+            {/* Info pages */}
             <Route
               path="/about"
               element={
@@ -223,7 +232,7 @@ export default function App() {
               }
             />
 
-            {/* Legal pages — public */}
+            {/* Legal pages */}
             <Route
               path="/privacy"
               element={
@@ -258,23 +267,7 @@ export default function App() {
             />
 
             {/* ════════════════════════════════════════
-                SEMI-PUBLIC ROUTES
-            ════════════════════════════════════════ */}
-
-            {/* Tutorial detail — requires login */}
-            <Route
-              path="/tutorials/:id"
-              element={
-                <PrivateRoute>
-                  <PageWrapper>
-                    <ModuleDetail />
-                  </PageWrapper>
-                </PrivateRoute>
-              }
-            />
-
-            {/* ════════════════════════════════════════
-                PROTECTED ROUTES (login required)
+                PROTECTED ROUTES — Login required
             ════════════════════════════════════════ */}
 
             {/* Home dashboard */}
@@ -352,11 +345,9 @@ export default function App() {
             <Route
               path="/admin"
               element={
-                <PrivateRoute adminOnly>
-                  <PageWrapper>
-                    <Admin />
-                  </PageWrapper>
-                </PrivateRoute>
+                <PageWrapper>
+                  <Admin />
+                </PageWrapper>
               }
             />
 

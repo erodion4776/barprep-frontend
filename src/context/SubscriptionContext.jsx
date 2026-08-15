@@ -14,13 +14,16 @@ export const PLANS = {
     color:       'slate',
     badge:       null,
     limits: {
-      aiMessages:     10,   // per day
-      mockQuestions:  5,    // per day
-      studyPlan:      false,
-      assignments:    false,
-      blog:           true,
-      tutorials:      true,
-      analytics:      false,
+      aiMessages:      10,    // per day
+      mockQuestions:   5,     // per day
+      studyPlan:       false, // locked
+      assignments:     false, // locked
+      analytics:       false, // locked
+      examSimulation:  false, // locked
+      essayGrading:    false, // locked
+      blog:            true,  // free
+      tutorials:       true,  // free (list only)
+      tutorialDetail:  false, // locked — need account but not paid
     },
   },
   pro: {
@@ -32,13 +35,16 @@ export const PLANS = {
     badge:       '🔥 Most Popular',
     stripePriceId: import.meta.env.VITE_STRIPE_PRO_PRICE_ID,
     limits: {
-      aiMessages:     -1,   // unlimited
-      mockQuestions:  -1,   // unlimited
-      studyPlan:      true,
-      assignments:    true,
-      blog:           true,
-      tutorials:      true,
-      analytics:      true,
+      aiMessages:      -1,   // unlimited
+      mockQuestions:   -1,   // unlimited
+      studyPlan:       true,
+      assignments:     true,
+      analytics:       true,
+      examSimulation:  false,
+      essayGrading:    false,
+      blog:            true,
+      tutorials:       true,
+      tutorialDetail:  true,
     },
   },
   barready: {
@@ -47,19 +53,19 @@ export const PLANS = {
     price:       400,
     period:      'year',
     color:       'purple',
-    badge:       '👑 Best Value',
+    badge:       '👑 Save $800',
     stripePriceId: import.meta.env.VITE_STRIPE_BARREADY_PRICE_ID,
     limits: {
-      aiMessages:     -1,   // unlimited
-      mockQuestions:  -1,   // unlimited
-      studyPlan:      true,
-      assignments:    true,
-      blog:           true,
-      tutorials:      true,
-      analytics:      true,
-      examSimulation: true,
-      essayGrading:   true,
-      prioritySupport:true,
+      aiMessages:      -1,
+      mockQuestions:   -1,
+      studyPlan:       true,
+      assignments:     true,
+      analytics:       true,
+      examSimulation:  true,
+      essayGrading:    true,
+      blog:            true,
+      tutorials:       true,
+      tutorialDetail:  true,
     },
   },
 }
@@ -68,11 +74,11 @@ export const PLANS = {
 const SubscriptionContext = createContext(null)
 
 export function SubscriptionProvider({ children }) {
-  const [profile,  setProfile]  = useState(null)
-  const [loading,  setLoading]  = useState(true)
-  const [plan,     setPlan]     = useState('free')
+  const [profile, setProfile] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [plan,    setPlan]    = useState('free')
 
-  // ── Load user profile + plan ───────────────────────────────────────────────
+  // ── Load profile ───────────────────────────────────────────────────────────
   const loadProfile = useCallback(async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser()
@@ -92,10 +98,12 @@ export function SubscriptionProvider({ children }) {
       if (error && error.code !== 'PGRST116') throw error
 
       const userProfile = data || {
-        id:   user.id,
-        plan: 'free',
-        ai_messages_today:    0,
-        mock_questions_today: 0,
+        id:                      user.id,
+        plan:                    'free',
+        ai_messages_today:       0,
+        mock_questions_today:    0,
+        ai_messages_reset_at:    new Date().toISOString().split('T')[0],
+        mock_questions_reset_at: new Date().toISOString().split('T')[0],
       }
 
       setProfile(userProfile)
@@ -120,75 +128,92 @@ export function SubscriptionProvider({ children }) {
     return () => subscription?.unsubscribe()
   }, [loadProfile])
 
-  // ── Check if feature is available ─────────────────────────────────────────
+  // ── Can use feature ────────────────────────────────────────────────────────
   const canUse = useCallback((feature) => {
     const currentPlan = PLANS[plan] || PLANS.free
     const limit = currentPlan.limits[feature]
     if (limit === undefined) return false
     if (limit === true)      return true
     if (limit === false)     return false
-    if (limit === -1)        return true  // unlimited
+    if (limit === -1)        return true
     return true
   }, [plan])
 
-  // ── Check if within daily limit ────────────────────────────────────────────
+  // ── Check daily limit ──────────────────────────────────────────────────────
   const checkLimit = useCallback((type) => {
     const currentPlan = PLANS[plan] || PLANS.free
+
     if (!profile) return { allowed: false, remaining: 0, limit: 0 }
 
     if (type === 'aiMessages') {
       const limit = currentPlan.limits.aiMessages
       if (limit === -1) return { allowed: true, remaining: -1, limit: -1 }
-      const used      = profile.ai_messages_today || 0
+
+      const today     = new Date().toISOString().split('T')[0]
+      const resetDate = profile.ai_messages_reset_at
+      const used      = resetDate < today ? 0 : (profile.ai_messages_today || 0)
       const remaining = Math.max(0, limit - used)
-      return { allowed: remaining > 0, remaining, limit }
+      return { allowed: remaining > 0, remaining, limit, used }
     }
 
     if (type === 'mockQuestions') {
       const limit = currentPlan.limits.mockQuestions
       if (limit === -1) return { allowed: true, remaining: -1, limit: -1 }
-      const used      = profile.mock_questions_today || 0
+
+      const today     = new Date().toISOString().split('T')[0]
+      const resetDate = profile.mock_questions_reset_at
+      const used      = resetDate < today ? 0 : (profile.mock_questions_today || 0)
       const remaining = Math.max(0, limit - used)
-      return { allowed: remaining > 0, remaining, limit }
+      return { allowed: remaining > 0, remaining, limit, used }
     }
 
     return { allowed: true, remaining: -1, limit: -1 }
   }, [plan, profile])
 
-  // ── Increment usage counter ────────────────────────────────────────────────
+  // ── Increment usage ────────────────────────────────────────────────────────
   const incrementUsage = useCallback(async (type) => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
 
-    const field = type === 'aiMessages'
-      ? 'ai_messages_today'
-      : 'mock_questions_today'
-
     const today = new Date().toISOString().split('T')[0]
 
-    // Reset if new day
-    const resetField = type === 'aiMessages'
-      ? 'ai_messages_reset_at'
-      : 'mock_questions_reset_at'
+    if (type === 'aiMessages') {
+      const needsReset = !profile?.ai_messages_reset_at ||
+                          profile.ai_messages_reset_at < today
+      const newCount = needsReset ? 1 : (profile?.ai_messages_today || 0) + 1
 
-    const resetDate = profile?.[resetField]
-    const needsReset = !resetDate || resetDate < today
+      const { data } = await supabase
+        .from('profiles')
+        .update({
+          ai_messages_today:    newCount,
+          ai_messages_reset_at: today,
+        })
+        .eq('id', user.id)
+        .select()
+        .single()
 
-    const updates = needsReset
-      ? { [field]: 1, [resetField]: today }
-      : { [field]: (profile?.[field] || 0) + 1 }
+      if (data) setProfile(data)
+    }
 
-    const { data } = await supabase
-      .from('profiles')
-      .update(updates)
-      .eq('id', user.id)
-      .select()
-      .single()
+    if (type === 'mockQuestions') {
+      const needsReset = !profile?.mock_questions_reset_at ||
+                          profile.mock_questions_reset_at < today
+      const newCount = needsReset ? 1 : (profile?.mock_questions_today || 0) + 1
 
-    if (data) setProfile(data)
+      const { data } = await supabase
+        .from('profiles')
+        .update({
+          mock_questions_today:    newCount,
+          mock_questions_reset_at: today,
+        })
+        .eq('id', user.id)
+        .select()
+        .single()
+
+      if (data) setProfile(data)
+    }
   }, [profile])
 
-  // ── Get current plan details ───────────────────────────────────────────────
   const currentPlan = PLANS[plan] || PLANS.free
 
   return (

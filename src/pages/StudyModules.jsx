@@ -1,1288 +1,666 @@
-import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
-import { Link }                from 'react-router-dom'
-import { apiClient, supabase } from '../api/client'
-import LoadingSpinner          from '../components/LoadingSpinner'
-import { useProgress }         from '../context/ProgressContext'
-import { useSubscription }     from '../context/SubscriptionContext'
-import { UpgradeBanner }       from '../components/UpgradePrompt'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { useParams, Link, useNavigate }  from 'react-router-dom'
+import { apiClient, supabase }           from '../api/client'
+import LoadingSpinner                    from '../components/LoadingSpinner'
+import ReactMarkdown                     from 'react-markdown'
+import { useProgress }                   from '../context/ProgressContext'
+import { useSubscription }               from '../context/SubscriptionContext'
+import { UpgradeBanner }                 from '../components/UpgradePrompt'
 
-// ── Constants ─────────────────────────────────────────────────────────────────
-const TOPICS = [
-  'Constitutional Law', 'Contracts',    'Torts',
-  'Criminal Law',       'Civil Procedure', 'Evidence',
-  'Real Property',      'Business Associations',
-  'Family Law',         'Wills & Trusts',
-]
-
-const ASSIGNMENT_TYPES = [
-  { value: 'essay',    label: '📝 Essay Answer'      },
-  { value: 'memo',     label: '📄 Legal Memo'        },
-  { value: 'brief',    label: '⚖️ Case Brief'        },
-  { value: 'outline',  label: '📋 Topic Outline'     },
-  { value: 'practice', label: '✍️ Practice Question' },
-]
-
-const TABS = [
-  { id: 'planner',    label: '📅 Study Planner' },
-  { id: 'assignment', label: '📝 Assignment'    },
-]
-
-const FOCUS_COLORS = {
-  weak:       'border-l-red-500    bg-red-50',
-  strong:     'border-l-green-500  bg-green-50',
-  review:     'border-l-amber-500  bg-amber-50',
-  'exam-sim': 'border-l-purple-500 bg-purple-50',
-  mixed:      'border-l-blue-500   bg-blue-50',
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function extractYouTubeId(url) {
+  if (!url) return null
+  const match = url.match(
+    /(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/
+  )
+  return match ? match[1] : null
 }
 
-// ── JSON parse helper ─────────────────────────────────────────────────────────
-function safeParseJSON(raw) {
-  const match = raw.match(/\{[\s\S]*\}/)
-  if (!match) throw new Error('No JSON found in response.')
-  try {
-    return JSON.parse(match[0])
-  } catch {
-    const cleaned = match[0]
-      .replace(/,(\s*[}\]])/g, '$1')
-      .replace(/[\u0000-\u001F]/g, ' ')
-      .replace(/\t/g, ' ')
-    return JSON.parse(cleaned)
+function buildGreeting(moduleData, progress) {
+  const { stats, weakTopics } = progress
+  const isWeak = weakTopics.includes(moduleData.topic)
+
+  let msg = `Hello! I've studied this lecture on **${moduleData.topic}** — "${moduleData.title}".\n\n`
+
+  if (stats.totalAttempts > 0) {
+    msg += `📊 Your overall accuracy is **${stats.overallAccuracy}%**. `
+    if (isWeak) {
+      msg += `**${moduleData.topic}** is one of your focus areas — let's make the most of this!\n\n`
+    } else {
+      msg += `\n\n`
+    }
   }
+
+  msg += `I can help you understand the concepts, answer questions, or quiz you. What would you like to know?`
+  return msg
 }
 
-// ── Grade helpers ─────────────────────────────────────────────────────────────
-const GRADE_COLORS = {
-  A: 'text-green-600', B: 'text-blue-600',
-  C: 'text-amber-600', D: 'text-orange-600',
-  F: 'text-red-600',
-}
-const GRADE_BG = {
-  A: 'bg-green-50 border-green-200',
-  B: 'bg-blue-50 border-blue-200',
-  C: 'bg-amber-50 border-amber-200',
-  D: 'bg-orange-50 border-orange-200',
-  F: 'bg-red-50 border-red-200',
-}
-const READINESS = {
-  'not-ready':    { label: 'Not Ready',     color: 'bg-red-100 text-red-700'     },
-  'developing':   { label: 'Developing',    color: 'bg-amber-100 text-amber-700' },
-  'almost-ready': { label: 'Almost Ready',  color: 'bg-blue-100 text-blue-700'   },
-  'ready':        { label: 'Bar Ready! 🎉', color: 'bg-green-100 text-green-700' },
-}
-
-// ── Score bar ─────────────────────────────────────────────────────────────────
-function ScoreBar({ score }) {
+// ── Typing indicator ──────────────────────────────────────────────────────────
+function TypingIndicator() {
   return (
-    <div className="w-full bg-slate-100 rounded-full h-2 mt-1">
-      <div
-        className={`h-2 rounded-full transition-all duration-500
-          ${score >= 80 ? 'bg-green-500'
-            : score >= 60 ? 'bg-blue-500'
-            : 'bg-amber-500'
-          }`}
-        style={{ width: `${Math.min(score ?? 0, 100)}%` }}
+    <div className="flex justify-start">
+      <div className="bg-slate-100 rounded-xl rounded-bl-sm px-3 py-2">
+        <div className="flex items-center gap-1">
+          {[0, 1, 2].map(i => (
+            <div
+              key={i}
+              className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce"
+              style={{ animationDelay: `${i * 150}ms` }}
+            />
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Copy button ───────────────────────────────────────────────────────────────
+function CopyButton({ text }) {
+  const [copied, setCopied] = useState(false)
+  const handle = async () => {
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {}
+  }
+  return (
+    <button
+      onClick={handle}
+      className="text-[10px] text-slate-400 hover:text-slate-600
+                 transition-colors flex items-center gap-1 mt-1"
+    >
+      {copied ? '✅ Copied' : '📋 Copy'}
+    </button>
+  )
+}
+
+// ── YouTube embed ─────────────────────────────────────────────────────────────
+function VideoPlayer({ url, title }) {
+  const youtubeId = extractYouTubeId(url)
+
+  if (!youtubeId) {
+    return (
+      <div className="rounded-xl border-2 border-dashed border-slate-300
+                      bg-slate-50 aspect-video flex items-center
+                      justify-center text-slate-400 text-sm">
+        No video available for this tutorial
+      </div>
+    )
+  }
+
+  return (
+    <div className="rounded-xl overflow-hidden shadow-md bg-black aspect-video">
+      <iframe
+        src={`https://www.youtube.com/embed/${youtubeId}?rel=0`}
+        title={title}
+        className="w-full h-full"
+        allow="accelerometer; autoplay; clipboard-write;
+               encrypted-media; gyroscope; picture-in-picture"
+        allowFullScreen
       />
     </div>
   )
 }
 
-// ── Skeleton for past assignments ─────────────────────────────────────────────
-function AssignmentSkeleton() {
+// ── Locked chat overlay ───────────────────────────────────────────────────────
+function LockedChat() {
   return (
-    <div className="bg-white border border-slate-200 rounded-xl
-                    p-4 animate-pulse flex items-center gap-3">
-      <div className="w-8 h-8 bg-slate-200 rounded" />
-      <div className="flex-1 space-y-2">
-        <div className="h-3 bg-slate-200 rounded w-1/2" />
-        <div className="h-3 bg-slate-100 rounded w-1/3" />
+    <div className="flex-1 flex flex-col items-center justify-center
+                    p-6 text-center space-y-4 bg-slate-50">
+      <div className="text-4xl">🔒</div>
+      <div>
+        <h3 className="font-bold text-slate-900 text-sm">
+          AI Coach is a Pro Feature
+        </h3>
+        <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+          Upgrade to Pro to ask the AI coach questions about this video
+          in real time.
+        </p>
       </div>
-    </div>
-  )
-}
-
-// ── Locked feature placeholder ────────────────────────────────────────────────
-function LockedFeature({ feature, title, desc }) {
-  return (
-    <div className="space-y-4">
-      <UpgradeBanner feature={feature} />
-      <div className="bg-slate-50 border-2 border-dashed border-slate-200
-                      rounded-2xl p-8 text-center space-y-3">
-        <div className="text-4xl">🔒</div>
-        <h3 className="font-bold text-slate-700">{title}</h3>
-        <p className="text-slate-500 text-sm">{desc}</p>
+      <div className="space-y-2 w-full">
         <Link
           to="/pricing"
-          className="inline-block px-6 py-2.5 bg-blue-600 text-white
-                     font-bold text-sm rounded-xl hover:bg-blue-700
-                     transition-colors"
+          className="block w-full py-2.5 bg-blue-600 text-white text-xs
+                     font-bold rounded-xl hover:bg-blue-700 transition-colors
+                     text-center"
         >
-          Upgrade to Pro — $100/mo →
+          🚀 Pro — $100/month
+        </Link>
+        <Link
+          to="/pricing"
+          className="block w-full py-2.5 bg-purple-600 text-white text-xs
+                     font-bold rounded-xl hover:bg-purple-700 transition-colors
+                     text-center"
+        >
+          👑 Bar Ready — $400/year
         </Link>
       </div>
+      <p className="text-[10px] text-slate-400">
+        You can still watch the video on the free plan
+      </p>
     </div>
   )
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
-export default function StudyModules() {
-  const { progress, getProgressSummary } = useProgress()
-  const { canUse, isFree }               = useSubscription()
+export default function ModuleDetail() {
+  const { id }     = useParams()
+  const navigate   = useNavigate()
+  const progress   = useProgress().progress
+  const { markModuleWatched, getProgressSummary } = useProgress()
+  const { canUse, isFree }                        = useSubscription()
 
-  // ── Tabs ───────────────────────────────────────────────────────────────────
-  const [activeTab, setActiveTab] = useState('planner')
+  // Can use AI chat on this page
+  const canUseAI = canUse('tutorialDetail')
 
-  // ── Study Planner ──────────────────────────────────────────────────────────
-  const [examDate,    setExamDate]    = useState(
-    () => localStorage.getItem('bar_exam_date') || ''
-  )
-  const [studyPlan,   setStudyPlan]   = useState(() => {
-    try { return JSON.parse(localStorage.getItem('bar_study_plan') || 'null') }
-    catch { return null }
-  })
-  const [planLoading, setPlanLoading] = useState(false)
-  const [planError,   setPlanError]   = useState('')
-  const [expandedDay, setExpandedDay] = useState(null)
+  const [module,      setModule]      = useState(null)
+  const [nextModule,  setNextModule]  = useState(null)
+  const [loading,     setLoading]     = useState(true)
+  const [errorType,   setErrorType]   = useState(null)
+  const [errorMsg,    setErrorMsg]    = useState('')
+  const [question,    setQuestion]    = useState('')
+  const [chatHistory, setChatHistory] = useState([])
+  const [chatLoading, setChatLoading] = useState(false)
 
-  // ── Assignment ─────────────────────────────────────────────────────────────
-  const [assignmentText,  setAssignmentText]  = useState('')
-  const [assignmentFile,  setAssignmentFile]  = useState(null)
-  const [assignmentTopic, setAssignmentTopic] = useState(TOPICS[0])
-  const [assignmentType,  setAssignmentType]  = useState('essay')
-  const [analysisResult,  setAnalysisResult]  = useState(null)
-  const [analysisLoading, setAnalysisLoading] = useState(false)
-  const [analysisError,   setAnalysisError]   = useState('')
-  const [pastAssignments, setPastAssignments] = useState([])
-  const [loadingPast,     setLoadingPast]     = useState(false)
+  const chatBottomRef = useRef(null)
+  const inputRef      = useRef(null)
 
-  const fileInputRef = useRef(null)
-
-  // ── Days until exam ────────────────────────────────────────────────────────
-  const daysLeft = useMemo(() => {
-    if (!examDate) return null
-    const diff = new Date(examDate) - new Date()
-    return Math.ceil(diff / 86400000)
-  }, [examDate])
-
-  // ── Today's plan ───────────────────────────────────────────────────────────
-  const todayIndex = useMemo(() => {
-    if (!studyPlan?.generatedAt) return 0
-    return Math.floor(
-      (new Date() - new Date(studyPlan.generatedAt)) / 86400000
-    )
-  }, [studyPlan?.generatedAt])
-
-  const todaysPlan = useMemo(
-    () => studyPlan?.days?.[todayIndex] || studyPlan?.days?.[0] || null,
-    [studyPlan, todayIndex]
-  )
-
-  // ── Load past assignments ──────────────────────────────────────────────────
-  const loadPastAssignments = useCallback(async () => {
-    setLoadingPast(true)
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-      const { data, error } = await supabase
-        .from('assignments')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(10)
-      if (!error && data) setPastAssignments(data)
-    } catch (err) {
-      console.error('Failed to load assignments:', err)
-    } finally {
-      setLoadingPast(false)
+  // ── Restore chat from sessionStorage ──────────────────────────────────────
+  useEffect(() => {
+    if (!canUseAI) return
+    const saved = sessionStorage.getItem(`module_chat_${id}`)
+    if (saved) {
+      try { setChatHistory(JSON.parse(saved)) } catch {}
     }
-  }, [])
+  }, [id, canUseAI])
+
+  // ── Auto-scroll ────────────────────────────────────────────────────────────
+  useEffect(() => {
+    chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [chatHistory, chatLoading])
+
+  // ── Load module ────────────────────────────────────────────────────────────
+  const loadModule = useCallback(async () => {
+    if (progress.loading) return
+
+    setLoading(true)
+    setErrorType(null)
+    setErrorMsg('')
+
+    try {
+      const { data, error: dbError } = await supabase
+        .from('course_modules')
+        .select('*')
+        .eq('id', id)
+        .maybeSingle()
+
+      if (dbError) {
+        setErrorType('network')
+        throw new Error(dbError.message)
+      }
+      if (!data) {
+        setErrorType('not_found')
+        throw new Error('Module not found')
+      }
+
+      setModule(data)
+      await markModuleWatched(data.id, data.title, data.topic)
+
+      // Build greeting only if AI is available and no saved chat
+      if (canUseAI) {
+        const saved = sessionStorage.getItem(`module_chat_${id}`)
+        if (!saved) {
+          const greeting = buildGreeting(data, progress)
+          const initial  = [{ role: 'assistant', content: greeting, isGreeting: true }]
+          setChatHistory(initial)
+          sessionStorage.setItem(`module_chat_${id}`, JSON.stringify(initial))
+        }
+      }
+
+      // Load next module in same topic
+      const { data: siblings } = await supabase
+        .from('course_modules')
+        .select('id, title, topic, order_index')
+        .eq('topic', data.topic)
+        .eq('is_published', true)
+        .order('order_index', { ascending: true })
+
+      if (siblings?.length > 1) {
+        const currentIdx = siblings.findIndex(m => m.id === data.id)
+        if (currentIdx !== -1 && currentIdx < siblings.length - 1) {
+          setNextModule(siblings[currentIdx + 1])
+        }
+      }
+
+    } catch (err) {
+      console.error('Error loading module:', err)
+      setErrorMsg(err.message || 'Unknown error')
+    } finally {
+      setLoading(false)
+    }
+  }, [id, progress.loading, markModuleWatched, canUseAI])
 
   useEffect(() => {
-    if (canUse('assignments')) {
-      loadPastAssignments()
-    }
-  }, [loadPastAssignments, canUse])
+    loadModule()
+  }, [loadModule])
 
-  // ── Generate study plan ────────────────────────────────────────────────────
-  const generateStudyPlan = useCallback(async (force = false) => {
-    if (!examDate)     { setPlanError('Please enter your bar exam date.'); return }
-    if (daysLeft <= 0) { setPlanError('Your exam date has already passed.'); return }
+  // ── Ask question ───────────────────────────────────────────────────────────
+  const askQuestion = useCallback(async (e) => {
+    e?.preventDefault()
+    const text = question.trim()
+    if (!text || chatLoading || !module || !canUseAI) return
 
-    if (studyPlan && !force) {
-      const ok = window.confirm('This will replace your existing study plan. Continue?')
-      if (!ok) return
-    }
+    setQuestion('')
+    setChatLoading(true)
 
-    setPlanLoading(true)
-    setPlanError('')
+    const withUser = [...chatHistory, { role: 'user', content: text }]
+    setChatHistory(withUser)
 
     try {
-      const progressSummary = getProgressSummary()
-      const weakTopics      = progress.weakTopics?.join(', ')   || 'None identified'
-      const strongTopics    = progress.strongTopics?.join(', ') || 'None identified'
-      const accuracy        = progress.stats?.overallAccuracy   || 0
-      const daysAvailable   = Math.min(daysLeft, 30)
-
-      const prompt = [
-        'You are an expert bar exam coach.',
-        'Create a detailed personalized day-by-day study plan.',
+      // Short context to save tokens
+      const contextMsg = [
+        `[Lecture: "${module.title}" | Topic: ${module.topic}]`,
+        module.ai_summary ? `[Summary: ${module.ai_summary.substring(0, 200)}]` : '',
+        `[Student accuracy: ${progress.stats?.overallAccuracy || 0}%]`,
         '',
-        'STUDENT PROFILE:',
-        progressSummary,
-        '',
-        'EXAM DETAILS:',
-        'Exam Date: ' + examDate,
-        'Days Until Exam: ' + daysLeft,
-        'Overall Accuracy: ' + accuracy + '%',
-        'Weak Topics: ' + weakTopics,
-        'Strong Topics: ' + strongTopics,
-        '',
-        'Return ONLY valid JSON:',
-        '{',
-        '  "overview": "Brief 2-sentence personalized overview",',
-        '  "daily_hours": 4,',
-        '  "focus_strategy": "One sentence strategy",',
-        '  "days": [',
-        '    {',
-        '      "day": 1,',
-        '      "date": "YYYY-MM-DD",',
-        '      "theme": "Topic Name",',
-        '      "focus": "weak",',
-        '      "tasks": ["Task 1", "Task 2", "Task 3"],',
-        '      "goal": "What to achieve today",',
-        '      "tip": "One study tip"',
-        '    }',
-        '  ],',
-        '  "weekly_milestones": ["Week 1: milestone"]',
-        '}',
-        '',
-        'Rules:',
-        '- Prioritize weak topics in early days',
-        '- Review strong topics every 5-7 days',
-        '- Mock exam days every 7 days',
-        '- Last 3 days: review and rest',
-        '- focus: weak | strong | review | exam-sim | mixed',
-        '- Generate exactly ' + daysAvailable + ' days',
-      ].join('\n')
+        `Student question: ${text}`,
+      ].filter(Boolean).join('\n')
 
-      const res  = await apiClient.chat(prompt, [])
-      const plan = safeParseJSON(res.data.reply || '')
+      const history = withUser
+        .filter(m => !m.isGreeting)
+        .slice(-6) // Keep last 6 messages to save tokens
+        .map(({ role, content }) => ({ role, content }))
 
-      plan.generatedAt = new Date().toISOString()
-      plan.examDate    = examDate
+      const res = await apiClient.chat(contextMsg, history)
 
-      setStudyPlan(plan)
-      localStorage.setItem('bar_study_plan', JSON.stringify(plan))
-      localStorage.setItem('bar_exam_date',  examDate)
-
-      // Sync to Supabase
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        await supabase.from('study_plans').upsert({
-          user_id:   user.id,
-          plan,
-          exam_date: examDate,
-          updated_at: new Date().toISOString(),
-        }, { onConflict: 'user_id' })
-      }
+      const final = [
+        ...withUser,
+        { role: 'assistant', content: res.data.reply || '' },
+      ]
+      setChatHistory(final)
+      sessionStorage.setItem(`module_chat_${id}`, JSON.stringify(final))
     } catch (err) {
-      console.error('Plan generation error:', err)
-      setPlanError(err.message || 'Failed to generate plan. Please try again.')
+      const isRateLimit = err.message?.includes('429') ||
+                          err.message?.includes('rate limit')
+
+      const errContent = isRateLimit
+        ? '⏱️ Rate limit hit — please wait a few seconds and try again.'
+        : `Error: ${err.message}. Please try again.`
+
+      const errMsg = [
+        ...withUser,
+        { role: 'assistant', content: errContent },
+      ]
+      setChatHistory(errMsg)
     } finally {
-      setPlanLoading(false)
+      setChatLoading(false)
+      inputRef.current?.focus()
     }
-  }, [examDate, daysLeft, studyPlan, progress, getProgressSummary])
+  }, [question, chatLoading, module, chatHistory,
+      getProgressSummary, id, canUseAI, progress.stats])
 
-  // ── Read file content ──────────────────────────────────────────────────────
-  const readFileContent = (file) => new Promise((resolve, reject) => {
-    if (!file) { resolve(''); return }
-    if (file.size > 5 * 1024 * 1024) {
-      reject(new Error('File too large. Maximum size is 5MB.'))
-      return
-    }
-    const reader   = new FileReader()
-    reader.onload  = e => resolve(e.target.result)
-    reader.onerror = () => reject(new Error('Failed to read file.'))
-    reader.readAsText(file)
-  })
+  // ── Derived values ─────────────────────────────────────────────────────────
+  const isWeakTopic   = module ? progress.weakTopics.includes(module.topic)   : false
+  const isStrongTopic = module ? progress.strongTopics.includes(module.topic) : false
+  const topicPerf     = module ? progress.stats.topicPerformance?.[module.topic] : null
 
-  // ── Submit assignment ──────────────────────────────────────────────────────
-  const submitAssignment = useCallback(async () => {
-    if (!assignmentText.trim() && !assignmentFile) {
-      setAnalysisError('Please enter text or upload a file.')
-      return
-    }
+  const smartQuickQuestions = useMemo(() => {
+    if (!module || !canUseAI) return []
+    return [
+      isWeakTopic
+        ? `Explain ${module.topic} simply`
+        : `Summarize this lecture`,
+      'Quiz me on this topic',
+      'What are the key rules?',
+      isWeakTopic
+        ? `Common mistakes in ${module.topic}?`
+        : 'What will the bar exam test here?',
+    ]
+  }, [module, isWeakTopic, canUseAI])
 
-    setAnalysisLoading(true)
-    setAnalysisError('')
-    setAnalysisResult(null)
+  // ── Loading ────────────────────────────────────────────────────────────────
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <LoadingSpinner size="lg" text="Loading tutorial..." />
+      </div>
+    )
+  }
 
-    try {
-      let content = assignmentText.trim()
-      if (assignmentFile && !content) {
-        content = await readFileContent(assignmentFile)
-      }
-      if (!content || content.length < 20) {
-        throw new Error('Assignment content is too short to analyze.')
-      }
-
-      const safeContent = content
-        .substring(0, 3000)
-        .replace(/"/g,  "'")
-        .replace(/\\/g, ' ')
-        .replace(/[\u0000-\u001F]/g, ' ')
-        .replace(/\n|\r/g, ' ')
-        .trim()
-
-      const prompt = [
-        'You are an expert bar exam grader.',
-        'Analyze this student assignment carefully.',
-        '',
-        'STUDENT PROGRESS:',
-        getProgressSummary(),
-        '',
-        'ASSIGNMENT:',
-        'Type: '  + assignmentType,
-        'Topic: ' + assignmentTopic,
-        '',
-        'SUBMISSION:',
-        safeContent,
-        '',
-        'Return ONLY valid JSON:',
-        '{',
-        '  "overall_grade": "A",',
-        '  "score": 85,',
-        '  "summary": "2-3 sentence assessment",',
-        '  "strengths": ["Strength 1", "Strength 2", "Strength 3"],',
-        '  "weaknesses": ["Weakness 1", "Weakness 2"],',
-        '  "rule_accuracy":     { "score": 80, "feedback": "..." },',
-        '  "analysis_quality":  { "score": 75, "feedback": "..." },',
-        '  "issue_spotting":    { "score": 90, "feedback": "..." },',
-        '  "writing_quality":   { "score": 85, "feedback": "..." },',
-        '  "improvements": ["Improvement 1", "Improvement 2"],',
-        '  "model_answer_hints": "What a perfect answer includes",',
-        '  "bar_exam_readiness": "developing",',
-        '  "recommended_study": ["Topic 1", "Topic 2"]',
-        '}',
-        'overall_grade: A | B | C | D | F',
-        'bar_exam_readiness: not-ready | developing | almost-ready | ready',
-        'All scores: integers 0-100',
-      ].join('\n')
-
-      const res      = await apiClient.chat(prompt, [])
-      const analysis = safeParseJSON(res.data.reply || '')
-
-      setAnalysisResult(analysis)
-
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        const { error: saveErr } = await supabase
-          .from('assignments')
-          .insert({
-            user_id:    user.id,
-            topic:      assignmentTopic,
-            type:       assignmentType,
-            content:    content.substring(0, 3000),
-            grade:      analysis.overall_grade,
-            score:      analysis.score,
-            feedback:   JSON.stringify(analysis),
-            file_name:  assignmentFile?.name || null,
-            created_at: new Date().toISOString(),
-          })
-        if (saveErr) console.error('Save assignment error:', saveErr)
-        else await loadPastAssignments()
-      }
-    } catch (err) {
-      console.error('Analysis error:', err)
-      setAnalysisError(err.message || 'Failed to analyze. Please try again.')
-    } finally {
-      setAnalysisLoading(false)
-    }
-  }, [
-    assignmentText, assignmentFile, assignmentType,
-    assignmentTopic, getProgressSummary, loadPastAssignments,
-  ])
-
-  const resetAssignment = useCallback(() => {
-    setAnalysisResult(null)
-    setAssignmentText('')
-    setAssignmentFile(null)
-    setAnalysisError('')
-  }, [])
+  // ── Error ──────────────────────────────────────────────────────────────────
+  if (errorType || !module) {
+    return (
+      <div className="max-w-md mx-auto text-center py-12 space-y-4">
+        <div className="text-4xl">
+          {errorType === 'not_found' ? '🔍' : '⚠️'}
+        </div>
+        <h2 className="text-lg font-bold text-slate-900">
+          {errorType === 'not_found'
+            ? 'Tutorial Not Found'
+            : 'Failed to Load Tutorial'
+          }
+        </h2>
+        <p className="text-sm text-slate-500">
+          {errorType === 'not_found'
+            ? "This tutorial doesn't exist or has been removed."
+            : `Error: ${errorMsg}`
+          }
+        </p>
+        <Link
+          to="/tutorials"
+          className="inline-block px-6 py-2.5 border border-slate-200
+                     text-slate-700 rounded-xl hover:bg-slate-50
+                     transition-colors text-sm font-medium"
+        >
+          ← Back to Tutorials
+        </Link>
+      </div>
+    )
+  }
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto px-4 sm:px-6 lg:px-0">
+    <div className="space-y-6 max-w-5xl mx-auto px-4 sm:px-6 lg:px-0">
 
-      {/* ── Header ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center
-                      sm:justify-between gap-3 pb-5 border-b border-slate-100">
-        <div>
+      {/* ── Breadcrumb ── */}
+      <div className="flex items-center gap-2 text-sm text-slate-500 flex-wrap">
+        <Link to="/"         className="hover:text-blue-600 transition-colors">Home</Link>
+        <span>→</span>
+        <Link to="/tutorials" className="hover:text-blue-600 transition-colors">Tutorials</Link>
+        <span>→</span>
+        <span className="text-slate-700 truncate max-w-[200px]">{module.title}</span>
+      </div>
+
+      {/* ── Module Header ── */}
+      <div className="flex flex-col sm:flex-row sm:items-start
+                      sm:justify-between gap-4">
+        <div className="space-y-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-bold px-2 py-0.5 bg-blue-100
+                             text-blue-700 rounded-full">
+              {module.topic}
+            </span>
+            {isWeakTopic && (
+              <span className="text-xs font-bold px-2 py-0.5 bg-amber-100
+                               text-amber-700 rounded-full">
+                ⚠️ Focus Area
+              </span>
+            )}
+            {isStrongTopic && (
+              <span className="text-xs font-bold px-2 py-0.5 bg-green-100
+                               text-green-700 rounded-full">
+                ✅ Strong Area
+              </span>
+            )}
+            {/* Free plan badge */}
+            {isFree && (
+              <span className="text-xs font-bold px-2 py-0.5 bg-slate-100
+                               text-slate-600 rounded-full">
+                Free Preview
+              </span>
+            )}
+          </div>
           <h1 className="text-2xl sm:text-3xl font-black text-slate-900">
-            Study Center
+            {module.title}
           </h1>
-          <p className="text-slate-500 mt-1 text-sm">
-            Personalized study plan and AI-powered assignment analysis.
-          </p>
         </div>
 
-        {/* Exam countdown */}
-        {examDate && daysLeft !== null && (
-          <div className={`
-            p-4 text-center shrink-0 border-2 rounded-2xl
-            ${daysLeft <= 14
-              ? 'bg-red-50 border-red-200'
-              : daysLeft <= 30
-                ? 'bg-amber-50 border-amber-200'
-                : 'bg-blue-50 border-blue-200'
-            }
-          `}>
-            <div className={`text-3xl font-black
-              ${daysLeft <= 14 ? 'text-red-600'
-                : daysLeft <= 30 ? 'text-amber-600'
-                : 'text-blue-600'
+        {/* Topic performance */}
+        {topicPerf && topicPerf.attempts > 0 && (
+          <div className="bg-white border border-slate-200 rounded-2xl
+                          p-3 text-center shrink-0 min-w-[120px]">
+            <div className={`text-2xl font-extrabold
+              ${topicPerf.accuracy >= 75 ? 'text-green-600'
+                : topicPerf.accuracy >= 50 ? 'text-blue-600'
+                : 'text-amber-600'
               }`}>
-              {daysLeft > 0 ? daysLeft : '🎓'}
+              {topicPerf.accuracy}%
             </div>
-            <div className="text-xs font-bold text-slate-500 uppercase tracking-wide">
-              {daysLeft > 0 ? 'Days Until Exam' : 'Exam Day!'}
-            </div>
-            {daysLeft <= 14 && daysLeft > 0 && (
-              <div className="text-[10px] text-red-600 font-bold mt-1 animate-pulse">
-                Final stretch! 🔥
-              </div>
-            )}
+            <div className="text-[10px] text-slate-400 uppercase">Your Accuracy</div>
+            <div className="text-xs text-slate-500">{topicPerf.attempts} attempts</div>
           </div>
         )}
       </div>
 
-      {/* ── Progress Snapshot ── */}
-      {progress.stats?.totalAttempts > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {[
-            { label: 'Questions',   value: progress.stats.totalAttempts,      color: 'text-slate-900'  },
-            { label: 'Accuracy',    value: `${progress.stats.overallAccuracy}%`, color: 'text-blue-600' },
-            { label: 'Streak',      value: `${progress.stats.currentStreak ?? 0}🔥`, color: 'text-orange-500' },
-            { label: 'Focus Topics',value: progress.weakTopics?.length || 0,  color: 'text-amber-600'  },
-          ].map(({ label, value, color }) => (
-            <div key={label}
-                 className="bg-white border border-slate-200 rounded-xl p-3 text-center">
-              <div className={`text-xl font-extrabold ${color}`}>{value}</div>
-              <div className="text-[10px] text-slate-500 mt-0.5 uppercase font-semibold">
-                {label}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* ── Free plan upgrade prompt ── */}
-      {isFree && (
-        <div className="bg-gradient-to-r from-blue-50 to-purple-50
-                        border border-blue-200 rounded-2xl p-4
-                        flex flex-col sm:flex-row items-start sm:items-center
-                        justify-between gap-4">
-          <div className="flex items-start gap-3">
-            <span className="text-2xl">🔒</span>
-            <div>
-              <p className="text-sm font-bold text-slate-900">
-                Unlock the Full Study Center
-              </p>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Free plan has limited access. Upgrade to Pro for personalized
-                study plans, assignment grading, and advanced analytics.
-              </p>
-            </div>
-          </div>
-          <div className="flex gap-2 shrink-0 w-full sm:w-auto">
-            <Link
-              to="/pricing"
-              className="flex-1 sm:flex-none px-4 py-2 bg-blue-600 text-white
-                         text-xs font-bold rounded-xl hover:bg-blue-700
-                         transition-colors text-center"
-            >
-              Pro — $100/mo →
-            </Link>
-            <Link
-              to="/pricing"
-              className="flex-1 sm:flex-none px-4 py-2 bg-purple-600 text-white
-                         text-xs font-bold rounded-xl hover:bg-purple-700
-                         transition-colors text-center"
-            >
-              Bar Ready — $400/yr
-            </Link>
-          </div>
-        </div>
-      )}
-
-      {/* ── Tabs ── */}
-      <div className="flex gap-2 border-b border-slate-200">
-        {TABS.map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`
-              px-5 py-2.5 text-sm font-semibold border-b-2 transition-colors
-              ${activeTab === tab.id
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-slate-500 hover:text-slate-700'
-              }
-            `}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
-      {/* ══════════════════════════════════════════
-          TAB: STUDY PLANNER
-      ══════════════════════════════════════════ */}
-      {activeTab === 'planner' && (
-        <div className="space-y-6">
-
-          {/* Exam date input */}
-          <div className="bg-white border border-slate-200 rounded-2xl p-6 space-y-4">
-            <h2 className="text-lg font-bold text-slate-900">
-              📅 Set Your Bar Exam Date
-            </h2>
-            <p className="text-sm text-slate-500">
-              Enter your exam date and the AI will build a personalized
-              day-by-day plan based on your weak topics and progress.
+      {/* ── Weak topic alert ── */}
+      {isWeakTopic && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl
+                        p-4 flex items-start gap-3">
+          <span className="text-xl shrink-0">⚠️</span>
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-amber-900">
+              This is one of your focus areas
             </p>
+            <p className="text-xs text-amber-700 mt-0.5">
+              {topicPerf?.attempts > 0
+                ? `You're at ${topicPerf.accuracy}% accuracy on ${module.topic}. Watch carefully and use the AI coach.`
+                : `You haven't practiced ${module.topic} yet. After watching, test yourself!`
+              }
+            </p>
+            <div className="flex flex-wrap gap-2 mt-2">
+              <Link
+                to="/mock-exam"
+                className="text-xs bg-amber-600 text-white px-3 py-1
+                           rounded-full hover:bg-amber-700 transition-colors"
+              >
+                Practice Questions →
+              </Link>
+              <Link
+                to="/blog"
+                className="text-xs bg-amber-100 text-amber-800 px-3 py-1
+                           rounded-full hover:bg-amber-200 transition-colors
+                           border border-amber-200"
+              >
+                📰 Read Blog Tips →
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
 
-            <div className="flex flex-col sm:flex-row gap-3">
-              <div className="flex-1">
-                <label className="block text-xs font-bold text-slate-400
-                                   uppercase tracking-wide mb-2">
-                  Bar Exam Date
-                </label>
-                <input
-                  type="date"
-                  value={examDate}
-                  min={new Date().toISOString().split('T')[0]}
-                  onChange={e => setExamDate(e.target.value)}
-                  className="w-full border border-slate-200 rounded-xl px-4 py-2.5
-                             text-sm focus:outline-none focus:border-blue-500
-                             transition-colors"
-                />
-              </div>
-              <div className="sm:self-end">
-                {/* ── Gate study plan behind Pro ── */}
-                {!canUse('studyPlan') ? (
-                  <button
-                    disabled
-                    onClick={() => {}}
-                    className="w-full sm:w-auto px-6 min-h-[44px] bg-slate-100
-                               text-slate-400 font-bold rounded-xl
-                               cursor-not-allowed flex items-center gap-2 text-sm"
-                  >
-                    🔒 Generate Plan — Pro Only
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => generateStudyPlan(false)}
-                    disabled={planLoading || !examDate}
-                    className="w-full sm:w-auto px-6 min-h-[44px] bg-blue-600
-                               text-white font-bold rounded-xl hover:bg-blue-700
-                               transition-colors disabled:opacity-60
-                               flex items-center gap-2"
-                  >
-                    {planLoading
-                      ? <><LoadingSpinner size="sm" color="white" /> Building…</>
-                      : '🤖 Generate AI Plan'
-                    }
-                  </button>
-                )}
+      {/* ── Free plan AI coach prompt ── */}
+      {isFree && (
+        <UpgradeBanner feature="tutorialDetail" />
+      )}
+
+      {/* ── Main Grid ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+        {/* ── Left column ── */}
+        <div className="lg:col-span-2 space-y-5">
+
+          {/* Video */}
+          <VideoPlayer url={module.video_url} title={module.title} />
+
+          {/* AI Summary */}
+          {module.ai_summary && (
+            <div className="bg-white border border-slate-200 rounded-2xl p-5">
+              <h2 className="text-base font-semibold text-slate-900 mb-3">
+                📋 What You Will Learn
+              </h2>
+              <p className="text-slate-600 text-sm leading-relaxed">
+                {module.ai_summary}
+              </p>
+            </div>
+          )}
+
+          {/* Course Outline */}
+          {module.ai_outline && (
+            <div className="bg-white border border-slate-200 rounded-2xl p-5">
+              <h2 className="text-base font-semibold text-slate-900 mb-3">
+                📚 Course Outline
+              </h2>
+              <div className="prose prose-sm prose-slate max-w-none">
+                <ReactMarkdown>{module.ai_outline}</ReactMarkdown>
               </div>
             </div>
+          )}
 
-            {planError && (
-              <div className="p-3 bg-red-50 border border-red-200 rounded-xl
-                              text-red-700 text-sm">
-                ❌ {planError}
-              </div>
-            )}
-
-            {/* Locked state banner */}
-            {!canUse('studyPlan') && (
-              <UpgradeBanner feature="studyPlan" />
-            )}
-
-            {progress.weakTopics?.length > 0 && canUse('studyPlan') && (
-              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-                <p className="text-xs font-bold text-amber-800 uppercase
-                               tracking-wide mb-2">
-                  ⚠️ AI will prioritize these weak topics:
+          {/* Next module */}
+          {nextModule && (
+            <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4
+                            flex items-center justify-between gap-4">
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-blue-600 uppercase mb-1">
+                  Up Next
                 </p>
-                <div className="flex flex-wrap gap-2">
-                  {progress.weakTopics.map(t => (
-                    <span key={t}
-                          className="text-xs bg-amber-100 text-amber-800
-                                     border border-amber-200 px-2.5 py-1
-                                     rounded-full font-medium">
-                      {t}
-                    </span>
+                <p className="text-sm font-semibold text-slate-900 truncate">
+                  {nextModule.title}
+                </p>
+              </div>
+              <Link
+                to={`/tutorials/${nextModule.id}`}
+                className="shrink-0 px-4 py-2 bg-blue-600 text-white text-xs
+                           font-bold rounded-xl hover:bg-blue-700 transition-colors"
+              >
+                Next →
+              </Link>
+            </div>
+          )}
+
+          {/* What to do next */}
+          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-3">
+            <h3 className="text-sm font-bold text-slate-700">⚡ What to Do Next</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              {[
+                { to: '/mock-exam', icon: '📝', title: 'Practice Questions', desc: `Test your ${module.topic} knowledge` },
+                { to: '/chat',      icon: '🤖', title: 'Ask AI Coach',       desc: 'Deep dive into concepts'            },
+                { to: '/blog',      icon: '📰', title: 'Bar Prep Blog',      desc: `Tips on ${module.topic}`            },
+              ].map(({ to, icon, title, desc }) => (
+                <Link
+                  key={to}
+                  to={to}
+                  className="flex items-center gap-2 p-3 bg-white rounded-xl
+                             border border-slate-200 hover:border-blue-300
+                             hover:bg-blue-50 transition-all"
+                >
+                  <span className="text-lg">{icon}</span>
+                  <div>
+                    <div className="font-semibold text-xs text-slate-800">{title}</div>
+                    <div className="text-[10px] text-slate-500">{desc}</div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* ── Right column: Chat ── */}
+        <div className="lg:col-span-1">
+          <div className="bg-white border border-slate-200 rounded-2xl
+                          flex flex-col h-[500px] lg:h-[600px]
+                          sticky top-20 overflow-hidden">
+
+            {/* Chat header */}
+            <div className="p-4 border-b border-slate-100 bg-slate-50 shrink-0">
+              <h3 className="font-semibold text-slate-900 text-sm">
+                🤖 AI Lecture Coach
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                {!canUseAI
+                  ? '🔒 Pro feature — upgrade to ask questions'
+                  : isWeakTopic
+                    ? `⚠️ Focus area — I'll explain carefully`
+                    : 'Ask questions about this lecture'
+                }
+              </p>
+            </div>
+
+            {/* ── Locked state for free users ── */}
+            {!canUseAI ? (
+              <LockedChat />
+            ) : (
+              <>
+                {/* Messages */}
+                <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                  {chatHistory.map((msg, i) => (
+                    <div
+                      key={i}
+                      className={`flex ${
+                        msg.role === 'user' ? 'justify-end' : 'justify-start'
+                      }`}
+                    >
+                      <div className={`
+                        max-w-[90%] rounded-xl px-3 py-2 text-xs leading-relaxed
+                        ${msg.role === 'user'
+                          ? 'bg-blue-600 text-white rounded-br-sm'
+                          : 'bg-slate-100 text-slate-800 rounded-bl-sm'
+                        }
+                      `}>
+                        {msg.role === 'assistant' ? (
+                          <>
+                            <div className="prose prose-xs prose-slate max-w-none">
+                              <ReactMarkdown>{msg.content}</ReactMarkdown>
+                            </div>
+                            <CopyButton text={msg.content} />
+                          </>
+                        ) : (
+                          <p>{msg.content}</p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+
+                  {chatLoading && <TypingIndicator />}
+                  <div ref={chatBottomRef} />
+                </div>
+
+                {/* Quick questions */}
+                <div className="px-3 py-2 border-t border-slate-100
+                                flex gap-2 overflow-x-auto shrink-0">
+                  {smartQuickQuestions.map(q => (
+                    <button
+                      key={q}
+                      onClick={() => {
+                        setQuestion(q)
+                        inputRef.current?.focus()
+                      }}
+                      className="text-xs bg-slate-50 border border-slate-200
+                                 rounded-full px-3 py-1 whitespace-nowrap
+                                 hover:bg-blue-50 hover:border-blue-300
+                                 text-slate-600 hover:text-blue-700
+                                 transition-colors shrink-0"
+                    >
+                      {q}
+                    </button>
                   ))}
                 </div>
-              </div>
+
+                {/* Input */}
+                <form
+                  onSubmit={askQuestion}
+                  className="p-3 border-t border-slate-100 flex gap-2 shrink-0"
+                >
+                  <input
+                    ref={inputRef}
+                    type="text"
+                    value={question}
+                    onChange={e => setQuestion(e.target.value)}
+                    placeholder={
+                      isWeakTopic
+                        ? `What confuses you about ${module.topic}?`
+                        : 'Ask about this lecture...'
+                    }
+                    className="flex-1 border border-slate-200 rounded-xl px-3 py-2
+                               text-xs focus:outline-none focus:border-blue-500
+                               transition-colors"
+                    disabled={chatLoading}
+                  />
+                  <button
+                    type="submit"
+                    disabled={chatLoading || !question.trim()}
+                    className="px-3 py-2 bg-blue-600 text-white text-xs font-bold
+                               rounded-xl hover:bg-blue-700 transition-colors
+                               disabled:opacity-60 shrink-0"
+                  >
+                    {chatLoading ? '…' : 'Ask'}
+                  </button>
+                </form>
+              </>
             )}
           </div>
-
-          {/* Today's Focus */}
-          {studyPlan && todaysPlan && canUse('studyPlan') && (
-            <div className="bg-blue-600 text-white p-6 rounded-2xl space-y-4">
-              <div className="flex items-center justify-between flex-wrap gap-2">
-                <div>
-                  <p className="text-blue-200 text-xs font-bold uppercase tracking-wide">
-                    Today's Focus
-                  </p>
-                  <h2 className="text-2xl font-extrabold mt-0.5">
-                    Day {todaysPlan.day}: {todaysPlan.theme}
-                  </h2>
-                </div>
-                <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase
-                  ${todaysPlan.focus === 'weak'     ? 'bg-red-500'
-                    : todaysPlan.focus === 'exam-sim' ? 'bg-purple-500'
-                    : todaysPlan.focus === 'review'   ? 'bg-amber-500'
-                    : 'bg-blue-500'
-                  } text-white`}>
-                  {todaysPlan.focus}
-                </span>
-              </div>
-
-              <div className="space-y-2">
-                {todaysPlan.tasks?.map((task, i) => (
-                  <div key={i} className="flex items-start gap-2 text-sm">
-                    <span className="text-blue-300 mt-0.5 shrink-0">✓</span>
-                    <span className="text-blue-50">{task}</span>
-                  </div>
-                ))}
-              </div>
-
-              <div className="bg-blue-700/50 rounded-xl p-3 space-y-1">
-                <p className="text-xs font-bold text-blue-200 uppercase">
-                  🎯 Today's Goal
-                </p>
-                <p className="text-sm text-white">{todaysPlan.goal}</p>
-              </div>
-
-              {todaysPlan.tip && (
-                <div className="bg-blue-700/30 rounded-xl p-3">
-                  <p className="text-xs text-blue-200">
-                    💡 <span className="font-bold">Tip:</span> {todaysPlan.tip}
-                  </p>
-                </div>
-              )}
-
-              <div className="flex gap-2 pt-1">
-                <Link to="/mock-exam"
-                      className="flex-1 text-center py-2 bg-white text-blue-600
-                                 rounded-xl text-sm font-bold hover:bg-blue-50
-                                 transition-colors">
-                  📝 Practice
-                </Link>
-                <Link to="/chat"
-                      className="flex-1 text-center py-2 bg-blue-500 text-white
-                                 rounded-xl text-sm font-bold hover:bg-blue-400
-                                 transition-colors">
-                  🤖 AI Coach
-                </Link>
-                <Link to="/blog"
-                      className="flex-1 text-center py-2 bg-blue-500 text-white
-                                 rounded-xl text-sm font-bold hover:bg-blue-400
-                                 transition-colors">
-                  📰 Blog
-                </Link>
-              </div>
-            </div>
-          )}
-
-          {/* Plan overview */}
-          {studyPlan && canUse('studyPlan') && (
-            <div className="space-y-4">
-              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 space-y-3">
-                <h2 className="text-base font-bold text-slate-900">
-                  📋 Your Personalized Study Plan
-                </h2>
-                <p className="text-sm text-slate-600">{studyPlan.overview}</p>
-                <div className="grid grid-cols-3 gap-3">
-                  {[
-                    { value: studyPlan.days?.length,       label: 'Days Planned',  color: 'text-blue-600'   },
-                    { value: studyPlan.daily_hours + 'h',  label: 'Daily Hours',   color: 'text-purple-600' },
-                    { value: daysLeft,                     label: 'Days Left',     color: 'text-green-600'  },
-                  ].map(({ value, label, color }) => (
-                    <div key={label}
-                         className="bg-white p-3 rounded-xl border border-slate-200 text-center">
-                      <div className={`text-2xl font-black ${color}`}>{value}</div>
-                      <div className="text-xs text-slate-500 uppercase font-semibold">{label}</div>
-                    </div>
-                  ))}
-                </div>
-                <div className="bg-blue-50 border border-blue-100 rounded-xl p-3">
-                  <p className="text-xs font-bold text-blue-800 uppercase mb-1">Strategy</p>
-                  <p className="text-sm text-blue-700">{studyPlan.focus_strategy}</p>
-                </div>
-              </div>
-
-              {/* Weekly milestones */}
-              {studyPlan.weekly_milestones?.length > 0 && (
-                <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-3">
-                  <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wide">
-                    🏁 Weekly Milestones
-                  </h3>
-                  {studyPlan.weekly_milestones.map((m, i) => (
-                    <div key={i}
-                         className="flex items-start gap-3 p-3 bg-slate-50
-                                    rounded-xl border border-slate-100">
-                      <span className="w-6 h-6 bg-blue-600 text-white rounded-full
-                                       flex items-center justify-center text-xs
-                                       font-bold shrink-0">
-                        {i + 1}
-                      </span>
-                      <p className="text-sm text-slate-700">{m}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Day-by-day */}
-              <div className="space-y-3">
-                <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wide">
-                  📆 Day-by-Day Schedule
-                </h3>
-                {studyPlan.days?.map(day => {
-                  const isExpanded    = expandedDay === day.day
-                  const isActualToday = todayIndex === day.day - 1
-
-                  return (
-                    <div
-                      key={day.day}
-                      className={`
-                        border border-slate-200 rounded-xl overflow-hidden
-                        border-l-4 transition-all
-                        ${FOCUS_COLORS[day.focus] || 'border-l-slate-300 bg-white'}
-                        ${isActualToday ? 'ring-2 ring-blue-400 ring-offset-1' : ''}
-                      `}
-                    >
-                      <button
-                        onClick={() => setExpandedDay(isExpanded ? null : day.day)}
-                        className="w-full flex items-center justify-between p-4
-                                   text-left hover:bg-white/50 transition-colors"
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className={`
-                            w-10 h-10 rounded-xl flex items-center justify-center
-                            text-sm font-black shrink-0
-                            ${isActualToday
-                              ? 'bg-blue-600 text-white'
-                              : 'bg-white border border-slate-200 text-slate-700'
-                            }
-                          `}>
-                            {day.day}
-                          </div>
-                          <div>
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <p className="font-semibold text-slate-900 text-sm">
-                                {day.theme}
-                              </p>
-                              {isActualToday && (
-                                <span className="text-[10px] bg-blue-600 text-white
-                                                 px-2 py-0.5 rounded-full font-bold">
-                                  TODAY
-                                </span>
-                              )}
-                            </div>
-                            <p className="text-xs text-slate-500 mt-0.5">
-                              {day.date} •{' '}
-                              <span className="capitalize font-medium">{day.focus}</span>
-                            </p>
-                          </div>
-                        </div>
-                        <span className={`text-slate-400 text-xs transition-transform
-                          ${isExpanded ? 'rotate-180' : ''}`}>
-                          ▼
-                        </span>
-                      </button>
-
-                      {isExpanded && (
-                        <div className="px-4 pb-4 space-y-3 border-t border-slate-100 pt-3">
-                          <div className="space-y-1.5">
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-2">
-                              Tasks
-                            </p>
-                            {day.tasks?.map((task, i) => (
-                              <div key={i} className="flex items-start gap-2 text-sm text-slate-700">
-                                <span className="text-blue-500 mt-0.5 shrink-0 font-bold">{i + 1}.</span>
-                                {task}
-                              </div>
-                            ))}
-                          </div>
-
-                          <div className="bg-white border border-slate-200 rounded-xl p-3">
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-1">
-                              🎯 Goal
-                            </p>
-                            <p className="text-sm text-slate-700">{day.goal}</p>
-                          </div>
-
-                          {day.tip && (
-                            <div className="bg-amber-50 border border-amber-100 rounded-xl p-3">
-                              <p className="text-xs text-amber-700">
-                                💡 <span className="font-bold">Tip:</span> {day.tip}
-                              </p>
-                            </div>
-                          )}
-
-                          <div className="flex gap-2">
-                            <Link to="/mock-exam"
-                                  className="flex-1 text-center py-2 bg-blue-600 text-white
-                                             rounded-xl text-xs font-bold hover:bg-blue-700
-                                             transition-colors">
-                              Practice
-                            </Link>
-                            <Link to="/chat"
-                                  className="flex-1 text-center py-2 bg-slate-100 text-slate-700
-                                             rounded-xl text-xs font-bold hover:bg-slate-200
-                                             transition-colors">
-                              AI Coach
-                            </Link>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-
-              <button
-                onClick={() => generateStudyPlan(false)}
-                disabled={planLoading}
-                className="w-full py-2.5 text-sm font-medium border border-slate-200
-                           text-slate-600 rounded-xl hover:bg-slate-50 transition-colors
-                           disabled:opacity-60"
-              >
-                {planLoading ? 'Regenerating…' : '🔄 Regenerate Plan'}
-              </button>
-            </div>
-          )}
         </div>
-      )}
-
-      {/* ══════════════════════════════════════════
-          TAB: ASSIGNMENT
-      ══════════════════════════════════════════ */}
-      {activeTab === 'assignment' && (
-        <div className="space-y-6">
-
-          {/* ── Gate assignments behind Pro ── */}
-          {!canUse('assignments') ? (
-            <LockedFeature
-              feature="assignments"
-              title="Assignment Analysis is a Pro Feature"
-              desc="Upgrade to Pro to submit essays, memos, and practice answers for instant AI grading and detailed feedback."
-            />
-          ) : (
-            <>
-              {/* Submit form */}
-              <div className="bg-white border border-slate-200 rounded-2xl p-6 space-y-5">
-                <div>
-                  <h2 className="text-lg font-bold text-slate-900">
-                    📝 Submit Assignment for AI Analysis
-                  </h2>
-                  <p className="text-sm text-slate-500 mt-1">
-                    Submit your essay, memo, brief, or practice answer.
-                    AI will grade it and give detailed feedback.
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-400
-                                       uppercase tracking-wide mb-2">
-                      Topic
-                    </label>
-                    <select
-                      value={assignmentTopic}
-                      onChange={e => setAssignmentTopic(e.target.value)}
-                      className="w-full border border-slate-200 rounded-xl px-4 py-2.5
-                                 text-sm focus:outline-none focus:border-blue-500
-                                 transition-colors bg-white"
-                    >
-                      {TOPICS.map(t => (
-                        <option key={t} value={t}>{t}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-400
-                                       uppercase tracking-wide mb-2">
-                      Type
-                    </label>
-                    <select
-                      value={assignmentType}
-                      onChange={e => setAssignmentType(e.target.value)}
-                      className="w-full border border-slate-200 rounded-xl px-4 py-2.5
-                                 text-sm focus:outline-none focus:border-blue-500
-                                 transition-colors bg-white"
-                    >
-                      {ASSIGNMENT_TYPES.map(t => (
-                        <option key={t.value} value={t.value}>{t.label}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-400
-                                     uppercase tracking-wide mb-2">
-                    Your Assignment Text
-                  </label>
-                  <textarea
-                    value={assignmentText}
-                    onChange={e => setAssignmentText(e.target.value)}
-                    placeholder="Paste or type your assignment here..."
-                    rows={10}
-                    className="w-full border border-slate-200 rounded-xl px-4 py-2.5
-                               text-sm resize-none font-mono focus:outline-none
-                               focus:border-blue-500 transition-colors"
-                  />
-                  <div className="flex justify-between mt-1">
-                    <span className="text-[10px] text-slate-400">Be as detailed as possible</span>
-                    <span className={`text-[10px] ${
-                      assignmentText.length > 3000 ? 'text-amber-600' : 'text-slate-400'
-                    }`}>
-                      {assignmentText.length} / 3000
-                      {assignmentText.length > 3000 && ' (truncated)'}
-                    </span>
-                  </div>
-                </div>
-
-                {/* File upload */}
-                <div>
-                  <label className="block text-xs font-bold text-slate-400
-                                     uppercase tracking-wide mb-2">
-                    Or Upload a File
-                  </label>
-                  <div
-                    onClick={() => fileInputRef.current?.click()}
-                    className={`border-2 border-dashed rounded-xl p-6 text-center
-                                cursor-pointer transition-colors
-                                ${assignmentFile
-                                  ? 'border-blue-300 bg-blue-50'
-                                  : 'border-slate-300 hover:border-blue-300 hover:bg-slate-50'
-                                }`}
-                  >
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept=".txt,.pdf,.doc,.docx"
-                      className="hidden"
-                      onChange={e => setAssignmentFile(e.target.files?.[0] || null)}
-                    />
-                    {assignmentFile ? (
-                      <div className="space-y-1">
-                        <p className="text-sm font-bold text-blue-700">
-                          📎 {assignmentFile.name}
-                        </p>
-                        <p className="text-xs text-slate-500">
-                          {(assignmentFile.size / 1024).toFixed(1)} KB
-                        </p>
-                        <button
-                          onClick={e => { e.stopPropagation(); setAssignmentFile(null) }}
-                          className="text-xs text-red-500 hover:text-red-700 underline"
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="space-y-1">
-                        <p className="text-2xl">📁</p>
-                        <p className="text-sm text-slate-600 font-medium">Click to upload</p>
-                        <p className="text-xs text-slate-400">TXT, PDF, DOC — up to 5MB</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {analysisError && (
-                  <div className="p-3 bg-red-50 border border-red-200 rounded-xl
-                                  text-red-700 text-sm flex gap-2">
-                    <span>❌</span>
-                    <span>{analysisError}</span>
-                  </div>
-                )}
-
-                <button
-                  onClick={submitAssignment}
-                  disabled={analysisLoading || (!assignmentText.trim() && !assignmentFile)}
-                  className="w-full py-3 bg-blue-600 text-white font-bold rounded-xl
-                             hover:bg-blue-700 transition-colors disabled:opacity-60
-                             flex items-center justify-center gap-2 min-h-[48px]"
-                >
-                  {analysisLoading
-                    ? <><LoadingSpinner size="sm" color="white" /> Analyzing…</>
-                    : '🤖 Submit for AI Analysis'
-                  }
-                </button>
-              </div>
-
-              {/* Analysis result */}
-              {analysisResult && (
-                <div className="space-y-4">
-                  {/* Grade banner */}
-                  <div className={`p-6 rounded-2xl border-2
-                    ${GRADE_BG[analysisResult.overall_grade] || 'bg-slate-50 border-slate-200'}`}>
-                    <div className="flex flex-col sm:flex-row sm:items-center
-                                    sm:justify-between gap-4">
-                      <div>
-                        <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">
-                          AI Grade — {assignmentType} on {assignmentTopic}
-                        </p>
-                        <div className="flex items-center gap-3 mt-2">
-                          <span className={`text-6xl font-black
-                            ${GRADE_COLORS[analysisResult.overall_grade] || 'text-slate-600'}`}>
-                            {analysisResult.overall_grade}
-                          </span>
-                          <div>
-                            <div className="text-2xl font-extrabold text-slate-900">
-                              {analysisResult.score}/100
-                            </div>
-                            <span className={`text-xs font-bold px-2.5 py-1 rounded-full
-                              ${(READINESS[analysisResult.bar_exam_readiness] || READINESS['developing']).color}`}>
-                              {(READINESS[analysisResult.bar_exam_readiness] || READINESS['developing']).label}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="space-y-2 min-w-[200px]">
-                        {[
-                          { label: 'Rule Accuracy',    score: analysisResult.rule_accuracy?.score    },
-                          { label: 'Analysis Quality', score: analysisResult.analysis_quality?.score },
-                          { label: 'Issue Spotting',   score: analysisResult.issue_spotting?.score   },
-                          { label: 'Writing Quality',  score: analysisResult.writing_quality?.score  },
-                        ].map(({ label, score }) => (
-                          <div key={label}>
-                            <div className="flex justify-between text-xs text-slate-600 mb-0.5">
-                              <span>{label}</span>
-                              <span className="font-bold">{score}%</span>
-                            </div>
-                            <ScoreBar score={score} />
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    <p className="text-sm text-slate-700 mt-4 leading-relaxed
-                                  border-t border-slate-200/50 pt-4">
-                      {analysisResult.summary}
-                    </p>
-                  </div>
-
-                  {/* Strengths & Weaknesses */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="bg-green-50 border border-green-200 rounded-2xl p-5 space-y-3">
-                      <h3 className="text-sm font-bold text-green-800 uppercase">✅ Strengths</h3>
-                      <ul className="space-y-2">
-                        {analysisResult.strengths?.map((s, i) => (
-                          <li key={i} className="flex items-start gap-2 text-sm text-green-900">
-                            <span className="text-green-500 shrink-0 font-bold">✓</span>
-                            {s}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                    <div className="bg-red-50 border border-red-200 rounded-2xl p-5 space-y-3">
-                      <h3 className="text-sm font-bold text-red-800 uppercase">⚠️ Weaknesses</h3>
-                      <ul className="space-y-2">
-                        {analysisResult.weaknesses?.map((w, i) => (
-                          <li key={i} className="flex items-start gap-2 text-sm text-red-900">
-                            <span className="text-red-500 shrink-0">•</span>
-                            {w}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  </div>
-
-                  {/* Detailed feedback */}
-                  <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-4">
-                    <h3 className="text-sm font-bold text-slate-800 uppercase">🔍 Detailed Feedback</h3>
-                    {[
-                      { label: 'Rule Accuracy',    data: analysisResult.rule_accuracy    },
-                      { label: 'Analysis Quality', data: analysisResult.analysis_quality },
-                      { label: 'Issue Spotting',   data: analysisResult.issue_spotting   },
-                      { label: 'Writing Quality',  data: analysisResult.writing_quality  },
-                    ].filter(({ data }) => data).map(({ label, data }) => (
-                      <div key={label} className="p-4 bg-slate-50 rounded-xl space-y-2">
-                        <div className="flex justify-between items-center">
-                          <p className="text-xs font-bold text-slate-700 uppercase">{label}</p>
-                          <span className={`text-sm font-extrabold
-                            ${data.score >= 80 ? 'text-green-600'
-                              : data.score >= 60 ? 'text-blue-600'
-                              : 'text-amber-600'
-                            }`}>
-                            {data.score}%
-                          </span>
-                        </div>
-                        <ScoreBar score={data.score} />
-                        <p className="text-xs text-slate-600">{data.feedback}</p>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Improvements */}
-                  <div className="bg-blue-50 border border-blue-200 rounded-2xl p-5">
-                    <h3 className="text-sm font-bold text-blue-900 uppercase mb-3">
-                      🚀 How to Improve
-                    </h3>
-                    <ol className="space-y-2">
-                      {analysisResult.improvements?.map((imp, i) => (
-                        <li key={i} className="flex items-start gap-3 text-sm text-blue-900">
-                          <span className="w-5 h-5 bg-blue-600 text-white rounded-full
-                                           flex items-center justify-center text-xs
-                                           font-bold shrink-0">
-                            {i + 1}
-                          </span>
-                          {imp}
-                        </li>
-                      ))}
-                    </ol>
-                  </div>
-
-                  {/* Model answer */}
-                  {analysisResult.model_answer_hints && (
-                    <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5">
-                      <h3 className="text-sm font-bold text-amber-900 uppercase mb-2">
-                        📖 Perfect Answer Guide
-                      </h3>
-                      <p className="text-sm text-amber-800">{analysisResult.model_answer_hints}</p>
-                    </div>
-                  )}
-
-                  {/* Recommended study */}
-                  {analysisResult.recommended_study?.length > 0 && (
-                    <div className="bg-white border border-slate-200 rounded-2xl p-5">
-                      <h3 className="text-sm font-bold text-slate-800 uppercase mb-3">
-                        📚 Recommended Study Areas
-                      </h3>
-                      <div className="flex flex-wrap gap-2 mb-3">
-                        {analysisResult.recommended_study.map((topic, i) => (
-                          <Link key={i} to="/chat"
-                                className="text-xs bg-slate-100 border border-slate-200
-                                           text-slate-700 px-3 py-1.5 rounded-full
-                                           hover:bg-blue-50 hover:border-blue-300
-                                           hover:text-blue-700 transition-colors font-medium">
-                            📖 {topic}
-                          </Link>
-                        ))}
-                      </div>
-                      <div className="flex gap-2">
-                        <Link to="/mock-exam"
-                              className="flex-1 text-center py-2.5 bg-blue-600 text-white
-                                         rounded-xl text-sm font-bold hover:bg-blue-700
-                                         transition-colors">
-                          📝 Practice
-                        </Link>
-                        <Link to="/blog"
-                              className="flex-1 text-center py-2.5 bg-slate-100 text-slate-700
-                                         rounded-xl text-sm font-bold hover:bg-slate-200
-                                         transition-colors">
-                          📰 Blog Tips
-                        </Link>
-                        <Link to="/tutorials"
-                              className="flex-1 text-center py-2.5 bg-slate-100 text-slate-700
-                                         rounded-xl text-sm font-bold hover:bg-slate-200
-                                         transition-colors">
-                          🎥 Tutorials
-                        </Link>
-                      </div>
-                    </div>
-                  )}
-
-                  <button
-                    onClick={resetAssignment}
-                    className="w-full py-2.5 text-sm font-medium border border-slate-200
-                               text-slate-600 rounded-xl hover:bg-slate-50 transition-colors"
-                  >
-                    ✍️ Submit Another Assignment
-                  </button>
-                </div>
-              )}
-
-              {/* Past assignments */}
-              {!analysisResult && (
-                <div className="space-y-4">
-                  <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wide">
-                    📋 Past Submissions
-                  </h3>
-
-                  {loadingPast ? (
-                    <div className="space-y-3">
-                      {[1, 2, 3].map(i => <AssignmentSkeleton key={i} />)}
-                    </div>
-                  ) : pastAssignments.length === 0 ? (
-                    <div className="bg-white border border-slate-200 rounded-xl
-                                    text-center py-8">
-                      <p className="text-slate-500 text-sm">
-                        No submissions yet. Submit an assignment above.
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      {pastAssignments.map((a, i) => {
-                        let parsed = null
-                        try { parsed = JSON.parse(a.feedback) } catch {}
-                        return (
-                          <details
-                            key={a.id || i}
-                            className="bg-white border border-slate-200 rounded-xl
-                                       overflow-hidden hover:border-slate-300 transition-all"
-                          >
-                            <summary className="flex items-center justify-between p-4
-                                                cursor-pointer select-none list-none">
-                              <div className="flex items-center gap-3">
-                                <span className={`text-2xl font-black
-                                  ${GRADE_COLORS[a.grade] || 'text-slate-600'}`}>
-                                  {a.grade || '?'}
-                                </span>
-                                <div>
-                                  <p className="text-sm font-semibold text-slate-900">
-                                    {a.topic} — {a.type}
-                                  </p>
-                                  <p className="text-xs text-slate-400 mt-0.5">
-                                    {a.score}/100 •{' '}
-                                    {a.created_at
-                                      ? new Date(a.created_at).toLocaleDateString()
-                                      : 'Just now'
-                                    }
-                                    {a.file_name && ` • 📎 ${a.file_name}`}
-                                  </p>
-                                </div>
-                              </div>
-                              <span className="text-slate-400 text-xs">▼</span>
-                            </summary>
-
-                            {parsed && (
-                              <div className="p-4 border-t border-slate-100 bg-slate-50 space-y-3">
-                                <p className="text-sm text-slate-700">{parsed.summary}</p>
-                                {parsed.improvements?.slice(0, 2).map((imp, j) => (
-                                  <p key={j} className="text-xs text-slate-600 flex gap-1.5">
-                                    <span className="text-blue-500">→</span>
-                                    {imp}
-                                  </p>
-                                ))}
-                              </div>
-                            )}
-                          </details>
-                        )
-                      })}
-                    </div>
-                  )}
-                </div>
-              )}
-            </>
-          )}
-        </div>
-      )}
+      </div>
 
     </div>
   )

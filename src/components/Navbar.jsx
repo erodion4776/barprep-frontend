@@ -4,12 +4,13 @@ import { supabase }                         from '../api/client'
 import { useSubscription }                  from '../context/SubscriptionContext'
 
 const NAV_LINKS = [
-  { to: '/',          label: 'Home'      },
-  { to: '/chat',      label: 'AI Coach'  },
-  { to: '/tutorials', label: 'Tutorials' },
-  { to: '/study',     label: 'Study'     },
-  { to: '/mock-exam', label: 'Mock Exam' },
-  { to: '/blog',      label: 'Blog'      },
+  { to: '/',          label: 'Home',       auth: false },
+  { to: '/home',      label: 'Dashboard',  auth: true  },
+  { to: '/chat',      label: 'AI Coach',   auth: true  },
+  { to: '/tutorials', label: 'Tutorials',  auth: false },
+  { to: '/study',     label: 'Study',      auth: true  },
+  { to: '/mock-exam', label: 'Mock Exam',  auth: true  },
+  { to: '/blog',      label: 'Blog',       auth: false },
 ]
 
 function getInitials(email = '') {
@@ -92,14 +93,24 @@ export default function Navbar() {
   }, [navigate])
 
   // ── Active check ───────────────────────────────────────────────────────────
-  const isActive = (to) =>
-    to === '/' ? pathname === '/' : pathname.startsWith(to)
+  const isActive = (to) => {
+    if (to === '/') return pathname === '/'
+    return pathname.startsWith(to)
+  }
+
+  // ── Filter nav links based on auth ─────────────────────────────────────────
+  const visibleLinks = NAV_LINKS.filter(link => {
+    // Always show non-auth links
+    if (!link.auth) return true
+    // Only show auth links if user is logged in
+    return !!user
+  })
 
   // ── Plan badge config ──────────────────────────────────────────────────────
   const planBadge = {
-    free:     { label: 'Free Plan',    bg: 'bg-slate-100',  text: 'text-slate-600'   },
-    pro:      { label: '🔥 Pro Plan',  bg: 'bg-blue-100',   text: 'text-blue-700'    },
-    barready: { label: '👑 Bar Ready', bg: 'bg-purple-100', text: 'text-purple-700'  },
+    free:     { label: 'Free Plan',    bg: 'bg-slate-100',  text: 'text-slate-600'  },
+    pro:      { label: '🔥 Pro Plan',  bg: 'bg-blue-100',   text: 'text-blue-700'   },
+    barready: { label: '👑 Bar Ready', bg: 'bg-purple-100', text: 'text-purple-700' },
   }[plan] || { label: 'Free Plan', bg: 'bg-slate-100', text: 'text-slate-600' }
 
   return (
@@ -115,7 +126,7 @@ export default function Navbar() {
 
           {/* ── Logo ── */}
           <Link
-            to="/"
+            to={user ? '/home' : '/'}
             className="flex items-center gap-2 shrink-0"
             onClick={() => setMenuOpen(false)}
           >
@@ -129,8 +140,8 @@ export default function Navbar() {
           </Link>
 
           {/* ── Desktop Links ── */}
-          <div className="hidden sm:flex items-center gap-1">
-            {NAV_LINKS.map(({ to, label }) => (
+          <div className="hidden md:flex items-center gap-1">
+            {visibleLinks.map(({ to, label }) => (
               <Link
                 key={to}
                 to={to}
@@ -196,7 +207,7 @@ export default function Navbar() {
                       {getInitials(user.email)}
                     </span>
                   </div>
-                  <span className="text-sm text-slate-600 max-w-[120px] truncate">
+                  <span className="text-sm text-slate-600 max-w-[100px] truncate">
                     {user.email}
                   </span>
                   <span className="text-slate-400 text-xs">▾</span>
@@ -205,7 +216,6 @@ export default function Navbar() {
                 {/* Dropdown */}
                 {userMenuOpen && (
                   <>
-                    {/* Backdrop to close dropdown */}
                     <div
                       className="fixed inset-0 z-40"
                       onClick={() => setUserMenuOpen(false)}
@@ -230,8 +240,7 @@ export default function Navbar() {
                             <Link
                               to="/pricing"
                               onClick={() => setUserMenuOpen(false)}
-                              className="text-[10px] text-blue-600 hover:underline
-                                         font-bold"
+                              className="text-[10px] text-blue-600 hover:underline font-bold"
                             >
                               Upgrade →
                             </Link>
@@ -254,7 +263,15 @@ export default function Navbar() {
                         className="block px-4 py-2.5 text-sm text-slate-600
                                    hover:bg-slate-50 transition-colors"
                       >
-                        💬 My Sessions
+                        💬 AI Coach
+                      </Link>
+                      <Link
+                        to="/mock-exam"
+                        onClick={() => setUserMenuOpen(false)}
+                        className="block px-4 py-2.5 text-sm text-slate-600
+                                   hover:bg-slate-50 transition-colors"
+                      >
+                        📝 Mock Exam
                       </Link>
                       <Link
                         to="/settings"
@@ -273,7 +290,6 @@ export default function Navbar() {
                         ⭐ {isFree ? 'Upgrade Plan' : 'Manage Plan'}
                       </Link>
 
-                      {/* Admin link in dropdown */}
                       {isAdmin && (
                         <Link
                           to="/admin"
@@ -290,8 +306,7 @@ export default function Navbar() {
                       <button
                         onClick={handleSignOut}
                         className="w-full text-left px-4 py-2.5 text-sm
-                                   text-red-600 hover:bg-red-50
-                                   transition-colors"
+                                   text-red-600 hover:bg-red-50 transition-colors"
                       >
                         → Sign Out
                       </button>
@@ -303,9 +318,8 @@ export default function Navbar() {
               <div className="flex items-center gap-2">
                 <Link
                   to="/login"
-                  className="px-4 py-2 text-sm font-medium
-                             text-slate-600 hover:text-slate-900
-                             transition-colors"
+                  className="px-4 py-2 text-sm font-medium text-slate-600
+                             hover:text-slate-900 transition-colors"
                 >
                   Login
                 </Link>
@@ -323,7 +337,7 @@ export default function Navbar() {
 
           {/* ── Mobile Hamburger ── */}
           <button
-            className="sm:hidden p-2 rounded-lg text-slate-600
+            className="md:hidden p-2 rounded-lg text-slate-600
                        hover:bg-slate-100 transition-colors"
             onClick={() => setMenuOpen(o => !o)}
             aria-label="Toggle menu"
@@ -350,7 +364,7 @@ export default function Navbar() {
       {/* ── Mobile Menu ── */}
       <div
         className={`
-          sm:hidden border-t border-slate-100 bg-white
+          md:hidden border-t border-slate-100 bg-white
           overflow-hidden transition-all duration-300 ease-in-out
           ${menuOpen ? 'max-h-[800px] opacity-100' : 'max-h-0 opacity-0'}
         `}
@@ -358,7 +372,7 @@ export default function Navbar() {
         <div className="px-4 py-3 space-y-1">
 
           {/* Nav links */}
-          {NAV_LINKS.map(({ to, label }) => (
+          {visibleLinks.map(({ to, label }) => (
             <Link
               key={to}
               to={to}
@@ -375,7 +389,7 @@ export default function Navbar() {
             </Link>
           ))}
 
-          {/* Pricing link */}
+          {/* Pricing */}
           <Link
             to="/pricing"
             className={`
@@ -390,7 +404,7 @@ export default function Navbar() {
             ⭐ Pricing
           </Link>
 
-          {/* Admin link */}
+          {/* Admin */}
           {isAdmin && (
             <Link
               to="/admin"
@@ -401,11 +415,11 @@ export default function Navbar() {
             </Link>
           )}
 
-          {/* Mobile auth section */}
+          {/* Mobile auth */}
           {user ? (
             <div className="border-t border-slate-100 pt-3 mt-2 space-y-1">
 
-              {/* Avatar + info + plan badge */}
+              {/* Avatar + info */}
               <div className="flex items-center gap-3 px-4 py-3">
                 <div className="w-10 h-10 bg-blue-600 rounded-full
                                 flex items-center justify-center shrink-0">
@@ -458,12 +472,10 @@ export default function Navbar() {
                 ⭐ {isFree ? 'Upgrade Plan' : 'Manage Plan'}
               </Link>
 
-              {/* Sign out */}
               <button
                 onClick={handleSignOut}
                 className="w-full text-left px-4 py-3 text-sm font-medium
-                           text-red-600 hover:bg-red-50 rounded-lg
-                           transition-colors"
+                           text-red-600 hover:bg-red-50 rounded-lg transition-colors"
               >
                 → Sign Out
               </button>

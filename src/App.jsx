@@ -1,41 +1,43 @@
 import { Routes, Route }    from 'react-router-dom'
 import { lazy, Suspense }   from 'react'
+import { Link }             from 'react-router-dom'
 
-import Navbar        from './components/Navbar'
-import Footer        from './components/Footer'
-import CookieBanner  from './components/CookieBanner'
-import PrivateRoute  from './components/PrivateRoute'
+import Navbar         from './components/Navbar'
+import Footer         from './components/Footer'
+import CookieBanner   from './components/CookieBanner'
+import PrivateRoute   from './components/PrivateRoute'
 import LoadingSpinner from './components/LoadingSpinner'
 
 // ── Eager imports (critical path) ─────────────────────────────────────────────
-import LandingPage   from './pages/LandingPage'
-import Login         from './pages/Login'
-import Signup        from './pages/Signup'
+import LandingPage from './pages/LandingPage'
+import Login       from './pages/Login'
+import Signup      from './pages/Signup'
 
 // ── Lazy imports (loaded on demand) ──────────────────────────────────────────
-const Home          = lazy(() => import('./pages/Home'))
-const Chat          = lazy(() => import('./pages/Chat'))
-const StudyModules  = lazy(() => import('./pages/StudyModules'))
-const MockExam      = lazy(() => import('./pages/MockExam'))
-const Tutorials     = lazy(() => import('./pages/Tutorials'))
-const ModuleDetail  = lazy(() => import('./pages/ModuleDetail'))
-const Admin         = lazy(() => import('./pages/Admin'))
-const AdminLogin    = lazy(() => import('./pages/AdminLogin'))
-const Blog          = lazy(() => import('./pages/Blog'))          // NEW
-const BlogPost      = lazy(() => import('./pages/BlogPost'))      // NEW
-const Settings      = lazy(() => import('./pages/Settings'))      // NEW
-const ResetPassword = lazy(() => import('./pages/ResetPassword')) // NEW
-const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'))
+const Home           = lazy(() => import('./pages/Home'))
+const Chat           = lazy(() => import('./pages/Chat'))
+const StudyModules   = lazy(() => import('./pages/StudyModules'))
+const MockExam       = lazy(() => import('./pages/MockExam'))
+const Tutorials      = lazy(() => import('./pages/Tutorials'))
+const ModuleDetail   = lazy(() => import('./pages/ModuleDetail'))
+const Admin          = lazy(() => import('./pages/Admin'))
+const AdminLogin     = lazy(() => import('./pages/AdminLogin'))
+const Blog           = lazy(() => import('./pages/Blog'))
+const BlogPost       = lazy(() => import('./pages/BlogPost'))
+const Settings       = lazy(() => import('./pages/Settings'))
+const ResetPassword  = lazy(() => import('./pages/ResetPassword'))
+const Pricing        = lazy(() => import('./pages/Pricing'))
+const PaymentSuccess = lazy(() => import('./pages/PaymentSuccess'))
+const PrivacyPolicy  = lazy(() => import('./pages/PrivacyPolicy'))
 const TermsOfService = lazy(() => import('./pages/TermsOfService'))
-const CookiePolicy  = lazy(() => import('./pages/CookiePolicy'))
-const Disclaimer    = lazy(() => import('./pages/Disclaimer'))
-const FAQ           = lazy(() => import('./pages/FAQ'))
-const Contact       = lazy(() => import('./pages/Contact'))
-const About         = lazy(() => import('./pages/About'))
+const CookiePolicy   = lazy(() => import('./pages/CookiePolicy'))
+const Disclaimer     = lazy(() => import('./pages/Disclaimer'))
+const FAQ            = lazy(() => import('./pages/FAQ'))
+const Contact        = lazy(() => import('./pages/Contact'))
+const About          = lazy(() => import('./pages/About'))
 
 // ── Page wrapper ──────────────────────────────────────────────────────────────
-function PageWrapper({ children, fullWidth = false }) {
-  if (fullWidth) return <>{children}</>
+function PageWrapper({ children }) {
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {children}
@@ -43,7 +45,7 @@ function PageWrapper({ children, fullWidth = false }) {
   )
 }
 
-// ── Lazy fallback ─────────────────────────────────────────────────────────────
+// ── Lazy loading fallback ─────────────────────────────────────────────────────
 function PageLoader() {
   return (
     <div className="min-h-[60vh] flex items-center justify-center">
@@ -53,8 +55,6 @@ function PageLoader() {
 }
 
 // ── 404 page ──────────────────────────────────────────────────────────────────
-import { Link } from 'react-router-dom'
-
 function NotFound() {
   return (
     <PageWrapper>
@@ -108,7 +108,7 @@ export default function App() {
       {/* ── Navbar ── */}
       <Navbar />
 
-      {/* ── Main ── */}
+      {/* ── Main content ── */}
       <main className="flex-1 w-full">
         <Suspense fallback={<PageLoader />}>
           <Routes>
@@ -117,25 +117,13 @@ export default function App() {
                 PUBLIC ROUTES
             ════════════════════════════════════════ */}
 
-            {/* Landing — full width, no wrapper */}
+            {/* Landing — full width marketing page */}
             <Route
               path="/"
               element={<LandingPage />}
             />
 
-            {/* Home dashboard — logged in users */}
-            <Route
-              path="/home"
-              element={
-                <PrivateRoute>
-                  <PageWrapper>
-                    <Home />
-                  </PageWrapper>
-                </PrivateRoute>
-              }
-            />
-
-            {/* Auth */}
+            {/* Auth routes */}
             <Route
               path="/login"
               element={
@@ -161,27 +149,23 @@ export default function App() {
               }
             />
 
-            {/* ════════════════════════════════════════
-                SEMI-PUBLIC (visible, auth for features)
-            ════════════════════════════════════════ */}
-
-            {/* Tutorials — public browsing, AI coach requires auth */}
+            {/* Pricing — public */}
             <Route
-              path="/tutorials"
+              path="/pricing"
               element={
                 <PageWrapper>
-                  <Tutorials />
+                  <Pricing />
                 </PageWrapper>
               }
             />
+
+            {/* Payment success — public */}
             <Route
-              path="/tutorials/:id"
+              path="/payment-success"
               element={
-                <PrivateRoute>
-                  <PageWrapper>
-                    <ModuleDetail />
-                  </PageWrapper>
-                </PrivateRoute>
+                <PageWrapper>
+                  <PaymentSuccess />
+                </PageWrapper>
               }
             />
 
@@ -203,10 +187,109 @@ export default function App() {
               }
             />
 
+            {/* Tutorials list — public browsing */}
+            <Route
+              path="/tutorials"
+              element={
+                <PageWrapper>
+                  <Tutorials />
+                </PageWrapper>
+              }
+            />
+
+            {/* Info pages — public */}
+            <Route
+              path="/about"
+              element={
+                <PageWrapper>
+                  <About />
+                </PageWrapper>
+              }
+            />
+            <Route
+              path="/faq"
+              element={
+                <PageWrapper>
+                  <FAQ />
+                </PageWrapper>
+              }
+            />
+            <Route
+              path="/contact"
+              element={
+                <PageWrapper>
+                  <Contact />
+                </PageWrapper>
+              }
+            />
+
+            {/* Legal pages — public */}
+            <Route
+              path="/privacy"
+              element={
+                <PageWrapper>
+                  <PrivacyPolicy />
+                </PageWrapper>
+              }
+            />
+            <Route
+              path="/terms"
+              element={
+                <PageWrapper>
+                  <TermsOfService />
+                </PageWrapper>
+              }
+            />
+            <Route
+              path="/cookies"
+              element={
+                <PageWrapper>
+                  <CookiePolicy />
+                </PageWrapper>
+              }
+            />
+            <Route
+              path="/disclaimer"
+              element={
+                <PageWrapper>
+                  <Disclaimer />
+                </PageWrapper>
+              }
+            />
+
             {/* ════════════════════════════════════════
-                PROTECTED ROUTES
+                SEMI-PUBLIC ROUTES
             ════════════════════════════════════════ */}
 
+            {/* Tutorial detail — requires login */}
+            <Route
+              path="/tutorials/:id"
+              element={
+                <PrivateRoute>
+                  <PageWrapper>
+                    <ModuleDetail />
+                  </PageWrapper>
+                </PrivateRoute>
+              }
+            />
+
+            {/* ════════════════════════════════════════
+                PROTECTED ROUTES (login required)
+            ════════════════════════════════════════ */}
+
+            {/* Home dashboard */}
+            <Route
+              path="/home"
+              element={
+                <PrivateRoute>
+                  <PageWrapper>
+                    <Home />
+                  </PageWrapper>
+                </PrivateRoute>
+              }
+            />
+
+            {/* AI Coach chat */}
             <Route
               path="/chat"
               element={
@@ -217,6 +300,8 @@ export default function App() {
                 </PrivateRoute>
               }
             />
+
+            {/* Study center */}
             <Route
               path="/study"
               element={
@@ -227,6 +312,8 @@ export default function App() {
                 </PrivateRoute>
               }
             />
+
+            {/* Mock exam */}
             <Route
               path="/mock-exam"
               element={
@@ -237,6 +324,8 @@ export default function App() {
                 </PrivateRoute>
               }
             />
+
+            {/* Settings */}
             <Route
               path="/settings"
               element={
@@ -272,38 +361,7 @@ export default function App() {
             />
 
             {/* ════════════════════════════════════════
-                INFO PAGES
-            ════════════════════════════════════════ */}
-
-            <Route path="/about"
-              element={<PageWrapper><About /></PageWrapper>}
-            />
-            <Route path="/faq"
-              element={<PageWrapper><FAQ /></PageWrapper>}
-            />
-            <Route path="/contact"
-              element={<PageWrapper><Contact /></PageWrapper>}
-            />
-
-            {/* ════════════════════════════════════════
-                LEGAL PAGES
-            ════════════════════════════════════════ */}
-
-            <Route path="/privacy"
-              element={<PageWrapper><PrivacyPolicy /></PageWrapper>}
-            />
-            <Route path="/terms"
-              element={<PageWrapper><TermsOfService /></PageWrapper>}
-            />
-            <Route path="/cookies"
-              element={<PageWrapper><CookiePolicy /></PageWrapper>}
-            />
-            <Route path="/disclaimer"
-              element={<PageWrapper><Disclaimer /></PageWrapper>}
-            />
-
-            {/* ════════════════════════════════════════
-                404
+                404 CATCH ALL
             ════════════════════════════════════════ */}
 
             <Route path="*" element={<NotFound />} />
@@ -315,7 +373,7 @@ export default function App() {
       {/* ── Footer ── */}
       <Footer />
 
-      {/* ── Cookie Banner ── */}
+      {/* ── Cookie consent banner ── */}
       <CookieBanner />
 
     </div>

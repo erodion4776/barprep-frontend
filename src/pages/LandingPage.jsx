@@ -117,133 +117,32 @@ const TOPICS = [
 ]
 
 const FEATURES = [
-  {
-    icon:   '🤖',
-    title:  'AI Coach That Knows You',
-    desc:   'Your AI coach reads your exam history, identifies weak spots, and teaches exactly what you need.',
-    color:  'bg-blue-50 border-blue-100',
-    iconBg: 'bg-blue-600',
-  },
-  {
-    icon:   '📝',
-    title:  'Realistic Mock Exams',
-    desc:   'AI-generated MBE questions with real exam pacing, instant grading, and detailed legal explanations.',
-    color:  'bg-purple-50 border-purple-100',
-    iconBg: 'bg-purple-600',
-  },
-  {
-    icon:   '📅',
-    title:  'Personalized Study Plan',
-    desc:   'Enter your exam date. The AI builds a day-by-day schedule prioritizing your weakest topics.',
-    color:  'bg-green-50 border-green-100',
-    iconBg: 'bg-green-600',
-  },
-  {
-    icon:   '📊',
-    title:  'Deep Analytics',
-    desc:   'Track accuracy by topic, monitor pacing, and see your bar exam readiness score in real time.',
-    color:  'bg-amber-50 border-amber-100',
-    iconBg: 'bg-amber-500',
-  },
-  {
-    icon:   '✍️',
-    title:  'Assignment AI Grader',
-    desc:   'Submit essays and legal memos. The AI grades them and gives specific, actionable feedback.',
-    color:  'bg-rose-50 border-rose-100',
-    iconBg: 'bg-rose-600',
-  },
-  {
-    icon:   '🎥',
-    title:  'Interactive Tutorials',
-    desc:   'Watch bar exam lectures with a built-in AI coach that answers questions in real time.',
-    color:  'bg-indigo-50 border-indigo-100',
-    iconBg: 'bg-indigo-600',
-  },
-  {
-    icon:   '📰',
-    title:  'Daily AI Blog',
-    desc:   'Fresh bar prep articles generated daily from live legal feeds — written by AI, reviewed by our team.',
-    color:  'bg-teal-50 border-teal-100',
-    iconBg: 'bg-teal-600',
-  },
+  { icon: '🤖', title: 'AI Coach That Knows You',    desc: 'Your AI coach reads your exam history, identifies weak spots, and teaches exactly what you need.',                  color: 'bg-blue-50 border-blue-100',    iconBg: 'bg-blue-600'   },
+  { icon: '📝', title: 'Realistic Mock Exams',        desc: 'AI-generated MBE questions with real exam pacing, instant grading, and detailed legal explanations.',               color: 'bg-purple-50 border-purple-100', iconBg: 'bg-purple-600' },
+  { icon: '📅', title: 'Personalized Study Plan',     desc: 'Enter your exam date. The AI builds a day-by-day schedule prioritizing your weakest topics.',                      color: 'bg-green-50 border-green-100',   iconBg: 'bg-green-600'  },
+  { icon: '📊', title: 'Deep Analytics',              desc: 'Track accuracy by topic, monitor pacing, and see your bar exam readiness score in real time.',                      color: 'bg-amber-50 border-amber-100',   iconBg: 'bg-amber-500'  },
+  { icon: '✍️', title: 'Assignment AI Grader',         desc: 'Submit essays and legal memos. The AI grades them and gives specific, actionable feedback.',                        color: 'bg-rose-50 border-rose-100',     iconBg: 'bg-rose-600'   },
+  { icon: '🎥', title: 'Interactive Tutorials',       desc: 'Watch bar exam lectures with a built-in AI coach that answers questions in real time.',                             color: 'bg-indigo-50 border-indigo-100', iconBg: 'bg-indigo-600' },
+  { icon: '📰', title: 'Daily AI Blog',               desc: 'Fresh bar prep articles generated daily from live legal feeds — written by AI, reviewed by our team.',               color: 'bg-teal-50 border-teal-100',     iconBg: 'bg-teal-600'   },
 ]
 
 const TESTIMONIALS = [
-  {
-    name:   'Sarah M.',
-    role:   'Passed July 2024',
-    state:  'California',
-    avatar: 'SM',
-    color:  'bg-blue-600',
-    text:   'I failed the bar twice before finding BarPrep AI. The personalized study plan identified that Contracts and Evidence were killing me. Three months later I passed!',
-    score:  '272/400 MBE Score',
-  },
-  {
-    name:   'James T.',
-    role:   'First-time Passer',
-    state:  'New York',
-    avatar: 'JT',
-    color:  'bg-purple-600',
-    text:   'I went from 45% accuracy to 78% in six weeks. The AI explanations for wrong answers taught me more than weeks of reading outlines.',
-    score:  '286/400 MBE Score',
-  },
-  {
-    name:   'Priya K.',
-    role:   'Passed February 2024',
-    state:  'Texas',
-    avatar: 'PK',
-    color:  'bg-green-600',
-    text:   'As a working mom with limited study time, the daily study plan was a game-changer. I studied 2 hours a day and passed on my first attempt!',
-    score:  '268/400 MBE Score',
-  },
-  {
-    name:   'Marcus R.',
-    role:   'Passed July 2024',
-    state:  'Florida',
-    avatar: 'MR',
-    color:  'bg-amber-600',
-    text:   'The assignment analysis feature is extraordinary. My essay scores went from a 3 to a 5.5 average after using the AI grader.',
-    score:  '279/400 MBE Score',
-  },
+  { name: 'Sarah M.', role: 'Passed July 2024', state: 'California', avatar: 'SM', color: 'bg-blue-600',   text: 'I failed the bar twice before finding BarPrep AI. The personalized study plan identified that Contracts and Evidence were killing me. Three months later I passed!', score: '272/400 MBE Score' },
+  { name: 'James T.', role: 'First-time Passer', state: 'New York',  avatar: 'JT', color: 'bg-purple-600', text: 'I went from 45% accuracy to 78% in six weeks. The AI explanations for wrong answers taught me more than weeks of reading outlines.',                         score: '286/400 MBE Score' },
+  { name: 'Priya K.', role: 'Passed February 2024', state: 'Texas',  avatar: 'PK', color: 'bg-green-600',  text: 'As a working mom with limited study time, the daily study plan was a game-changer. I studied 2 hours a day and passed on my first attempt!',                   score: '268/400 MBE Score' },
+  { name: 'Marcus R.', role: 'Passed July 2024', state: 'Florida',   avatar: 'MR', color: 'bg-amber-600',  text: 'The assignment analysis feature is extraordinary. My essay scores went from a 3 to a 5.5 average after using the AI grader.',                                  score: '279/400 MBE Score' },
 ]
 
 const FAQS = [
-  {
-    q: 'Is BarPrep AI a replacement for Barbri or Themis?',
-    a: 'BarPrep AI is a powerful supplement to traditional bar prep courses. We recommend using it alongside an accredited bar prep program for maximum results.',
-  },
-  {
-    q: 'How does the AI know what I need to study?',
-    a: 'Every time you answer a mock exam question, the AI tracks your performance by topic, accuracy, and speed. It builds a profile of your strengths and weaknesses to personalize everything.',
-  },
-  {
-    q: 'Is the blog content written by lawyers?',
-    a: 'Our blog is AI-generated from live bar prep feeds and is for educational purposes only. Content has not been reviewed by licensed attorneys. Always verify with official sources.',
-  },
-  {
-    q: 'Can I cancel anytime?',
-    a: 'Yes. No long-term contracts. Cancel anytime from your settings and retain access until the end of your billing period.',
-  },
-  {
-    q: 'What does the $100/month Pro plan include?',
-    a: 'Unlimited AI coaching, unlimited mock exams, personalized study plans, assignment AI grading, full analytics, all video tutorials, daily blog access, and priority email support.',
-  },
-  {
-    q: 'What about the $400/year Bar Ready plan?',
-    a: 'Everything in Pro plus full simulated bar exams, MEE essay grading, exam readiness reports, priority support, and a pass guarantee. You save $800 compared to paying monthly.',
-  },
-  {
-    q: 'Is there a free plan?',
-    a: 'Yes! The Free plan gives you 10 AI messages and 5 mock questions per day at no cost — no credit card required. Upgrade to Pro or Bar Ready anytime.',
-  },
-  {
-    q: 'What bar exams does BarPrep AI cover?',
-    a: 'All 10 MBE subjects plus MEE essay topics for the Uniform Bar Exam (UBE).',
-  },
-  {
-    q: 'Is BarPrep AI a law firm?',
-    a: 'No. BarPrep AI is an educational study platform. It does not provide legal advice and is not affiliated with the NCBE or any state bar association.',
-  },
+  { q: 'Is BarPrep AI a replacement for Barbri or Themis?',    a: 'BarPrep AI is a powerful supplement to traditional bar prep courses. We recommend using it alongside an accredited bar prep program for maximum results.' },
+  { q: 'How does the AI know what I need to study?',            a: 'Every time you answer a mock exam question, the AI tracks your performance by topic, accuracy, and speed. It builds a profile of your strengths and weaknesses to personalize everything.' },
+  { q: 'Is the blog content written by lawyers?',               a: 'Our blog is AI-generated from live bar prep feeds and is for educational purposes only. Content has not been reviewed by licensed attorneys. Always verify with official sources.' },
+  { q: 'Can I cancel anytime?',                                 a: 'Yes. No long-term contracts. Cancel anytime from your settings and retain access until the end of your billing period.' },
+  { q: 'What does the $100/month Pro plan include?',            a: 'Unlimited AI coaching, unlimited mock exams, personalized study plans, assignment AI grading, full analytics, all video tutorials, daily blog access, and priority email support.' },
+  { q: 'What about the $400/year Bar Ready plan?',              a: 'Everything in Pro plus full simulated bar exams, MEE essay grading, exam readiness reports, priority support, and a pass guarantee. You save $800 compared to paying monthly.' },
+  { q: 'Is there a free plan?',                                 a: 'Yes! The Free plan gives you 10 AI messages and 5 mock questions per day at no cost — no credit card required. Upgrade to Pro or Bar Ready anytime.' },
+  { q: 'What bar exams does BarPrep AI cover?',                 a: 'All 10 MBE subjects plus MEE essay topics for the Uniform Bar Exam (UBE).' },
+  { q: 'Is BarPrep AI a law firm?',                             a: 'No. BarPrep AI is an educational study platform. It does not provide legal advice and is not affiliated with the NCBE or any state bar association.' },
 ]
 
 const PLANS = [
@@ -258,7 +157,7 @@ const PLANS = [
       { text: '10 AI messages per day',           included: true  },
       { text: '5 mock exam questions per day',     included: true  },
       { text: 'Blog access',                       included: true  },
-      { text: 'Video tutorials',                   included: true  },
+      { text: 'Video tutorials (free to watch)',   included: true  },
       { text: 'Basic progress tracking',           included: true  },
       { text: 'Personalized study plan',           included: false },
       { text: 'Assignment AI grading',             included: false },
@@ -268,6 +167,7 @@ const PLANS = [
     ],
     cta:      'Get Started Free',
     ctaStyle: 'border-2 border-blue-600 text-blue-600 hover:bg-blue-50',
+    ctaTo:    '/signup',
   },
   {
     name:        'Pro',
@@ -282,7 +182,7 @@ const PLANS = [
       { text: 'Personalized study plan',           included: true  },
       { text: 'Assignment AI grading & feedback',  included: true  },
       { text: 'Full progress analytics',           included: true  },
-      { text: 'All video tutorials',               included: true  },
+      { text: 'All video tutorials + AI coach',    included: true  },
       { text: 'Blog access',                       included: true  },
       { text: 'Priority email support',            included: true  },
       { text: 'Cancel anytime',                    included: true  },
@@ -290,6 +190,7 @@ const PLANS = [
     ],
     cta:      'Start Pro — $100/mo',
     ctaStyle: 'bg-blue-600 text-white hover:bg-blue-700 shadow-xl shadow-blue-200',
+    ctaTo:    '/pricing',
   },
   {
     name:        'Bar Ready',
@@ -312,6 +213,7 @@ const PLANS = [
     ],
     cta:      'Go Bar Ready — $400/yr',
     ctaStyle: 'bg-purple-600 text-white hover:bg-purple-700 shadow-xl shadow-purple-200',
+    ctaTo:    '/pricing',
   },
 ]
 
@@ -348,15 +250,12 @@ export default function LandingPage() {
     return () => subscription?.unsubscribe()
   }, [])
 
-  const handleCTA = useCallback(() => {
-    if (authLoading) return
-    navigate(user ? '/chat' : '/signup')
-  }, [user, authLoading, navigate])
-
   return (
     <div className="overflow-x-hidden">
 
-      {/* ── HERO ── */}
+      {/* ══════════════════════════════════════════
+          HERO
+      ══════════════════════════════════════════ */}
       <section className="relative min-h-screen bg-gradient-to-br
                            from-slate-900 via-blue-950 to-slate-900
                            flex items-center justify-center
@@ -370,8 +269,7 @@ export default function LandingPage() {
           ].map((cls, i) => (
             <div
               key={i}
-              className={`absolute w-96 h-96 rounded-full blur-3xl
-                          animate-pulse ${cls}`}
+              className={`absolute w-96 h-96 rounded-full blur-3xl animate-pulse ${cls}`}
               style={{ animationDelay: `${i}s` }}
             />
           ))}
@@ -380,10 +278,8 @@ export default function LandingPage() {
         <div
           className="absolute inset-0 opacity-[0.03]"
           style={{
-            backgroundImage: `
-              linear-gradient(#fff 1px, transparent 1px),
-              linear-gradient(90deg,#fff 1px,transparent 1px)
-            `,
+            backgroundImage: `linear-gradient(#fff 1px, transparent 1px),
+                              linear-gradient(90deg,#fff 1px,transparent 1px)`,
             backgroundSize: '50px 50px',
           }}
         />
@@ -418,38 +314,61 @@ export default function LandingPage() {
             </p>
           </div>
 
-          <div className="flex flex-col sm:flex-row items-center
-                          justify-center gap-4">
-            <button
-              onClick={handleCTA}
-              className="w-full sm:w-auto px-10 py-4 bg-blue-600
-                         text-white text-lg font-bold rounded-2xl
-                         hover:bg-blue-500 transition-all duration-200
-                         shadow-2xl shadow-blue-900/50
-                         hover:-translate-y-0.5 active:scale-[0.98]"
-            >
-              {user ? 'Go to Dashboard →' : 'Try Now — It\'s Free →'}
-            </button>
-            <Link
-              to="/pricing"
-              className="w-full sm:w-auto px-10 py-4 border
-                         border-slate-600 text-slate-300 text-lg
-                         font-bold rounded-2xl hover:border-blue-500
-                         hover:text-white transition-all duration-200
-                         text-center"
-            >
-              View Pricing
-            </Link>
+          {/* ── Hero CTAs ── */}
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+            {user ? (
+              <>
+                <Link
+                  to="/home"
+                  className="w-full sm:w-auto px-10 py-4 bg-blue-600
+                             text-white text-lg font-bold rounded-2xl
+                             hover:bg-blue-500 transition-all duration-200
+                             shadow-2xl shadow-blue-900/50
+                             hover:-translate-y-0.5 active:scale-[0.98]
+                             text-center"
+                >
+                  Go to Dashboard →
+                </Link>
+                <Link
+                  to="/chat"
+                  className="w-full sm:w-auto px-10 py-4 border border-slate-600
+                             text-slate-300 text-lg font-bold rounded-2xl
+                             hover:border-blue-500 hover:text-white
+                             transition-all duration-200 text-center"
+                >
+                  🤖 AI Coach →
+                </Link>
+              </>
+            ) : (
+              <>
+                <Link
+                  to="/signup"
+                  className="w-full sm:w-auto px-10 py-4 bg-blue-600
+                             text-white text-lg font-bold rounded-2xl
+                             hover:bg-blue-500 transition-all duration-200
+                             shadow-2xl shadow-blue-900/50
+                             hover:-translate-y-0.5 active:scale-[0.98]
+                             text-center"
+                >
+                  Try Now — It's Free →
+                </Link>
+                <Link
+                  to="/pricing"
+                  className="w-full sm:w-auto px-10 py-4 border border-slate-600
+                             text-slate-300 text-lg font-bold rounded-2xl
+                             hover:border-blue-500 hover:text-white
+                             transition-all duration-200 text-center"
+                >
+                  View Pricing
+                </Link>
+              </>
+            )}
           </div>
 
-          <div className="flex items-center justify-center gap-6
-                          flex-wrap text-slate-500 text-xs">
-            {[
-              '✅ No credit card required',
-              '✅ Cancel anytime',
-              '✅ GDPR compliant',
-              '✅ 24/7 AI access',
-            ].map(t => (
+          <div className="flex items-center justify-center gap-6 flex-wrap
+                          text-slate-500 text-xs">
+            {['✅ No credit card required','✅ Cancel anytime',
+              '✅ GDPR compliant','✅ 24/7 AI access'].map(t => (
               <span key={t} className="font-medium">{t}</span>
             ))}
           </div>
@@ -515,7 +434,9 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── STATS ── */}
+      {/* ══════════════════════════════════════════
+          STATS
+      ══════════════════════════════════════════ */}
       <section ref={statsRef} className="bg-blue-600 py-16 px-4">
         <div className="max-w-5xl mx-auto">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-8 text-center">
@@ -537,7 +458,9 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── TOPICS ── */}
+      {/* ══════════════════════════════════════════
+          TOPICS
+      ══════════════════════════════════════════ */}
       <section className="py-16 px-4 bg-slate-50">
         <div className="max-w-5xl mx-auto text-center space-y-8">
           <div>
@@ -564,18 +487,20 @@ export default function LandingPage() {
               </div>
             ))}
           </div>
-          <button
-            onClick={handleCTA}
+          <Link
+            to={user ? '/mock-exam' : '/signup'}
             className="inline-block px-8 py-3 bg-blue-600 text-white
                        font-bold rounded-2xl hover:bg-blue-700 text-sm
                        transition-all hover:-translate-y-0.5"
           >
             Start Studying All Topics →
-          </button>
+          </Link>
         </div>
       </section>
 
-      {/* ── FEATURES ── */}
+      {/* ══════════════════════════════════════════
+          FEATURES
+      ══════════════════════════════════════════ */}
       <section className="py-20 px-4 bg-white">
         <div className="max-w-6xl mx-auto space-y-14">
           <div className="text-center space-y-3">
@@ -612,7 +537,9 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── HOW IT WORKS ── */}
+      {/* ══════════════════════════════════════════
+          HOW IT WORKS
+      ══════════════════════════════════════════ */}
       <section className="py-20 px-4 bg-slate-900 text-white">
         <div className="max-w-5xl mx-auto space-y-14">
           <div className="text-center space-y-3">
@@ -648,20 +575,22 @@ export default function LandingPage() {
             ))}
           </div>
           <div className="text-center">
-            <button
-              onClick={handleCTA}
+            <Link
+              to={user ? '/home' : '/signup'}
               className="px-10 py-4 bg-blue-600 text-white font-bold
                          rounded-2xl hover:bg-blue-500 text-base
                          transition-all hover:-translate-y-0.5
-                         shadow-2xl shadow-blue-900/50"
+                         shadow-2xl shadow-blue-900/50 inline-block"
             >
-              Start Your Journey Now →
-            </button>
+              {user ? 'Go to Dashboard →' : 'Start Your Journey Now →'}
+            </Link>
           </div>
         </div>
       </section>
 
-      {/* ── BLOG TEASER ── */}
+      {/* ══════════════════════════════════════════
+          BLOG TEASER
+      ══════════════════════════════════════════ */}
       <section className="py-20 px-4 bg-white">
         <div className="max-w-5xl mx-auto">
           <div className="bg-gradient-to-r from-teal-600 to-blue-700
@@ -691,14 +620,14 @@ export default function LandingPage() {
                 >
                   Read the Blog →
                 </Link>
-                <button
-                  onClick={handleCTA}
+                <Link
+                  to={user ? '/home' : '/signup'}
                   className="px-6 py-2.5 bg-white/20 hover:bg-white/30
                              text-white font-bold text-sm rounded-xl
                              transition-colors border border-white/30"
                 >
-                  Create Free Account
-                </button>
+                  {user ? 'Dashboard →' : 'Create Free Account'}
+                </Link>
               </div>
             </div>
 
@@ -727,7 +656,9 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── TESTIMONIALS ── */}
+      {/* ══════════════════════════════════════════
+          TESTIMONIALS
+      ══════════════════════════════════════════ */}
       <section className="py-20 px-4 bg-slate-50">
         <div className="max-w-6xl mx-auto space-y-12">
           <div className="text-center space-y-3">
@@ -780,7 +711,9 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── PRICING ── */}
+      {/* ══════════════════════════════════════════
+          PRICING
+      ══════════════════════════════════════════ */}
       <section id="pricing" className="py-20 px-4 bg-white">
         <div className="max-w-6xl mx-auto space-y-12">
           <div className="text-center space-y-4">
@@ -794,11 +727,8 @@ export default function LandingPage() {
               At $100/month, BarPrep AI costs less than one hour with
               a private tutor — and it's available 24/7.
             </p>
-
-            {/* Savings callout */}
             <div className="inline-flex items-center gap-2 bg-purple-50
-                            border border-purple-200 rounded-xl px-4 py-2
-                            text-sm">
+                            border border-purple-200 rounded-xl px-4 py-2 text-sm">
               <span className="text-purple-700 font-bold">
                 👑 Bar Ready saves you $800/year
               </span>
@@ -824,7 +754,6 @@ export default function LandingPage() {
                   ${plan.color}
                 `}
               >
-                {/* Badge */}
                 {plan.badge && (
                   <div className={`
                     absolute -top-4 left-1/2 -translate-x-1/2
@@ -836,11 +765,8 @@ export default function LandingPage() {
                   </div>
                 )}
 
-                {/* Plan info */}
                 <div className="space-y-2">
-                  <h3 className="text-xl font-black text-slate-900">
-                    {plan.name}
-                  </h3>
+                  <h3 className="text-xl font-black text-slate-900">{plan.name}</h3>
                   <p className="text-slate-500 text-xs">{plan.description}</p>
                   <div className="flex items-end gap-1 pt-2">
                     <span className="text-5xl font-black text-slate-900">
@@ -853,7 +779,6 @@ export default function LandingPage() {
                     )}
                   </div>
 
-                  {/* Savings note for Bar Ready */}
                   {plan.name === 'Bar Ready' && (
                     <div className="bg-purple-50 border border-purple-200
                                     rounded-xl p-2 text-center">
@@ -870,9 +795,8 @@ export default function LandingPage() {
                   )}
                 </div>
 
-                {/* CTA Button */}
                 <Link
-                  to={plan.price === 0 ? '/signup' : '/pricing'}
+                  to={plan.ctaTo}
                   className={`block w-full py-3.5 rounded-2xl text-sm
                                font-black transition-all duration-200
                                hover:-translate-y-0.5 text-center
@@ -881,7 +805,6 @@ export default function LandingPage() {
                   {plan.cta}
                 </Link>
 
-                {/* Features */}
                 <ul className="space-y-3">
                   {plan.features.map(({ text, included }) => (
                     <li
@@ -921,7 +844,9 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── COMPARISON ── */}
+      {/* ══════════════════════════════════════════
+          COMPARISON TABLE
+      ══════════════════════════════════════════ */}
       <section className="py-20 px-4 bg-slate-50">
         <div className="max-w-4xl mx-auto space-y-10">
           <div className="text-center space-y-3">
@@ -929,7 +854,7 @@ export default function LandingPage() {
               BarPrep AI vs Traditional Prep
             </h2>
             <p className="text-slate-500 text-sm">
-              See why thousands of students are switching to AI-powered prep.
+              See why students are switching to AI-powered prep.
             </p>
           </div>
           <div className="overflow-x-auto rounded-2xl border border-slate-200 shadow-sm">
@@ -937,22 +862,22 @@ export default function LandingPage() {
               <thead>
                 <tr className="bg-slate-900 text-white">
                   <th className="text-left p-4 font-bold rounded-tl-2xl">Feature</th>
-                  <th className="text-center p-4 font-bold text-blue-400">BarPrep AI Pro</th>
+                  <th className="text-center p-4 font-bold text-blue-400">BarPrep AI</th>
                   <th className="text-center p-4 font-bold text-slate-400 rounded-tr-2xl">Traditional</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {[
-                  ['Cost',                '$100/month or $400/year',  '$1,500–$4,000 one-time' ],
-                  ['Available',           '24/7 always on',           'Fixed schedule'          ],
-                  ['Personalization',     'AI-personalized daily',    'Generic curriculum'      ],
-                  ['Mock Questions',      'Unlimited AI-generated',   'Limited question bank'   ],
-                  ['Essay Grading',       'Instant AI feedback',      'Delayed human grading'   ],
-                  ['Progress Tracking',   'Real-time analytics',      'Self-tracked'            ],
-                  ['Study Plan',          'AI builds from data',      'Generic timeline'        ],
-                  ['Daily Blog',          '✅ AI-generated daily',    '❌ No'                    ],
-                  ['Adapts to Weakness',  '✅ Yes',                   '❌ No'                    ],
-                  ['Cancel Anytime',      '✅ Yes',                   '❌ Non-refundable'        ],
+                  ['Cost',               '$100/mo or $400/yr',  '$1,500–$4,000'      ],
+                  ['Available',          '24/7 always on',       'Fixed schedule'      ],
+                  ['Personalization',    'AI-personalized',      'Generic curriculum'  ],
+                  ['Mock Questions',     'Unlimited',            'Limited bank'        ],
+                  ['Essay Grading',      'Instant AI feedback',  'Delayed grading'     ],
+                  ['Progress Tracking',  'Real-time analytics',  'Self-tracked'        ],
+                  ['Study Plan',         'AI builds from data',  'Generic timeline'    ],
+                  ['Daily Blog',         '✅ AI-generated',      '❌ No'               ],
+                  ['Adapts to Weakness', '✅ Yes',               '❌ No'               ],
+                  ['Cancel Anytime',     '✅ Yes',               '❌ Non-refundable'   ],
                 ].map(([feat, ai, trad], i) => (
                   <tr key={feat}
                       className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}>
@@ -968,7 +893,9 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── FAQ ── */}
+      {/* ══════════════════════════════════════════
+          FAQ
+      ══════════════════════════════════════════ */}
       <section className="py-20 px-4 bg-white">
         <div className="max-w-3xl mx-auto space-y-10">
           <div className="text-center space-y-3">
@@ -995,7 +922,9 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── FINAL CTA ── */}
+      {/* ══════════════════════════════════════════
+          FINAL CTA
+      ══════════════════════════════════════════ */}
       <section className="py-24 px-4 bg-gradient-to-br from-blue-600
                           via-blue-700 to-purple-800 text-white
                           relative overflow-hidden">
@@ -1017,17 +946,30 @@ export default function LandingPage() {
               Start free today — no credit card needed.
             </p>
           </div>
-          <div className="flex flex-col sm:flex-row items-center
-                          justify-center gap-4">
-            <button
-              onClick={handleCTA}
-              className="w-full sm:w-auto px-12 py-5 bg-white text-blue-700
-                         text-xl font-black rounded-2xl hover:bg-blue-50
-                         transition-all duration-200 shadow-2xl
-                         hover:-translate-y-1 active:scale-[0.98]"
-            >
-              {user ? 'Go to Dashboard →' : 'Try Now — It\'s Free →'}
-            </button>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+            {user ? (
+              <Link
+                to="/home"
+                className="w-full sm:w-auto px-12 py-5 bg-white text-blue-700
+                           text-xl font-black rounded-2xl hover:bg-blue-50
+                           transition-all duration-200 shadow-2xl
+                           hover:-translate-y-1 active:scale-[0.98]
+                           text-center"
+              >
+                Go to Dashboard →
+              </Link>
+            ) : (
+              <Link
+                to="/signup"
+                className="w-full sm:w-auto px-12 py-5 bg-white text-blue-700
+                           text-xl font-black rounded-2xl hover:bg-blue-50
+                           transition-all duration-200 shadow-2xl
+                           hover:-translate-y-1 active:scale-[0.98]
+                           text-center"
+              >
+                Try Now — It's Free →
+              </Link>
+            )}
             <Link
               to="/pricing"
               className="text-blue-200 hover:text-white text-sm
@@ -1038,19 +980,17 @@ export default function LandingPage() {
           </div>
           <div className="flex items-center justify-center gap-8 flex-wrap
                           text-blue-200 text-xs">
-            {[
-              '✅ Free plan available',
-              '✅ Cancel anytime',
-              '✅ 24/7 AI access',
-              '✅ No contracts',
-            ].map(t => (
+            {['✅ Free plan available','✅ Cancel anytime',
+              '✅ 24/7 AI access','✅ No contracts'].map(t => (
               <span key={t} className="font-medium">{t}</span>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ── DISCLAIMER ── */}
+      {/* ══════════════════════════════════════════
+          DISCLAIMER FOOTER
+      ══════════════════════════════════════════ */}
       <div className="bg-slate-900 py-6 px-4">
         <p className="text-center text-slate-500 text-xs max-w-3xl mx-auto">
           ⚠️ BarPrep AI is an educational tool and is not affiliated with the

@@ -1,8 +1,8 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import { Link }         from 'react-router-dom'
-import { apiClient }    from '../api/client'
-import LoadingSpinner   from '../components/LoadingSpinner'
-import { useProgress }  from '../context/ProgressContext'
+import { Link }            from 'react-router-dom'
+import { apiClient }       from '../api/client'
+import LoadingSpinner      from '../components/LoadingSpinner'
+import { useProgress }     from '../context/ProgressContext'
 import { useSubscription } from '../context/SubscriptionContext'
 
 const ALL = 'All Topics'
@@ -23,8 +23,7 @@ const SORT_OPTIONS = [
 // ── Skeleton card ─────────────────────────────────────────────────────────────
 function SkeletonCard() {
   return (
-    <div className="bg-white border border-slate-200 rounded-2xl
-                    overflow-hidden animate-pulse">
+    <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden animate-pulse">
       <div className="aspect-video bg-slate-200" />
       <div className="p-4 space-y-3">
         <div className="h-3 bg-slate-200 rounded w-20" />
@@ -39,10 +38,9 @@ function SkeletonCard() {
   )
 }
 
-// ── Thumbnail with React fallback ─────────────────────────────────────────────
+// ── Thumbnail ─────────────────────────────────────────────────────────────────
 function Thumbnail({ src, alt }) {
   const [failed, setFailed] = useState(false)
-
   if (!src || failed) {
     return (
       <div className="w-full h-full flex items-center justify-center
@@ -51,7 +49,6 @@ function Thumbnail({ src, alt }) {
       </div>
     )
   }
-
   return (
     <img
       src={src}
@@ -64,49 +61,33 @@ function Thumbnail({ src, alt }) {
 }
 
 // ── Module card ───────────────────────────────────────────────────────────────
-function ModuleCard({ module, isWatched, isLocked }) {
-  const cardContent = (
-    <div className={`
-      group bg-white border border-slate-200 rounded-2xl
-      overflow-hidden transition-all duration-200 flex flex-col
-      ${isLocked
-        ? 'opacity-75 cursor-not-allowed'
-        : 'hover:shadow-lg hover:border-blue-200 hover:-translate-y-0.5 cursor-pointer'
-      }
-    `}>
+function ModuleCard({ module, isWatched, isFree }) {
+  return (
+    <Link
+      to={`/tutorials/${module.id}`}
+      className="group bg-white border border-slate-200 rounded-2xl
+                 overflow-hidden hover:shadow-lg hover:border-blue-200
+                 hover:-translate-y-0.5 transition-all duration-200
+                 flex flex-col"
+    >
       {/* Thumbnail */}
       <div className="relative bg-slate-100 aspect-video overflow-hidden">
         <Thumbnail src={module.thumbnail_url} alt={module.title} />
 
-        {/* Lock overlay for free users */}
-        {isLocked && (
-          <div className="absolute inset-0 bg-black/50 flex flex-col
-                          items-center justify-center gap-2">
-            <div className="text-3xl">🔒</div>
-            <div className="bg-blue-600 text-white text-xs font-bold
-                            px-3 py-1.5 rounded-full">
-              Pro Feature
-            </div>
+        {/* Play overlay */}
+        <div className="absolute inset-0 bg-black/20 flex items-center
+                        justify-center opacity-0 group-hover:opacity-100
+                        transition-opacity duration-200">
+          <div className="w-12 h-12 bg-white/90 rounded-full flex
+                          items-center justify-center shadow-lg">
+            <span className="text-blue-600 text-lg ml-1">▶</span>
           </div>
-        )}
-
-        {/* Play overlay for unlocked */}
-        {!isLocked && (
-          <div className="absolute inset-0 bg-black/20 flex items-center
-                          justify-center opacity-0 group-hover:opacity-100
-                          transition-opacity duration-200">
-            <div className="w-12 h-12 bg-white/90 rounded-full flex
-                            items-center justify-center shadow-lg">
-              <span className="text-blue-600 text-lg ml-1">▶</span>
-            </div>
-          </div>
-        )}
+        </div>
 
         {/* Watched badge */}
-        {isWatched && !isLocked && (
+        {isWatched && (
           <div className="absolute top-2 right-2 bg-green-500 text-white
-                          text-[10px] font-bold px-2 py-0.5 rounded-full
-                          flex items-center gap-1">
+                          text-[10px] font-bold px-2 py-0.5 rounded-full">
             ✓ Watched
           </div>
         )}
@@ -118,6 +99,15 @@ function ModuleCard({ module, isWatched, isLocked }) {
             #{module.order_index + 1}
           </div>
         )}
+
+        {/* Free plan AI locked badge */}
+        {isFree && (
+          <div className="absolute bottom-2 right-2 bg-amber-500/90 text-white
+                          text-[10px] font-bold px-2 py-0.5 rounded-full
+                          flex items-center gap-1">
+            🤖 AI Chat — Pro
+          </div>
+        )}
       </div>
 
       {/* Content */}
@@ -127,11 +117,8 @@ function ModuleCard({ module, isWatched, isLocked }) {
           {module.topic}
         </span>
 
-        <h3 className={`font-semibold text-sm line-clamp-2 mb-2
-          ${isLocked
-            ? 'text-slate-500'
-            : 'text-slate-900 group-hover:text-blue-600 transition-colors'
-          }`}>
+        <h3 className="font-semibold text-slate-900 text-sm line-clamp-2 mb-2
+                       group-hover:text-blue-600 transition-colors">
           {module.title}
         </h3>
 
@@ -142,49 +129,31 @@ function ModuleCard({ module, isWatched, isLocked }) {
         )}
 
         <div className="mt-3 flex items-center justify-between">
-          {isLocked ? (
-            <Link
-              to="/pricing"
-              onClick={e => e.stopPropagation()}
-              className="text-xs text-blue-600 font-bold hover:underline"
-            >
-              Upgrade to watch →
-            </Link>
-          ) : (
-            <span className="text-blue-600 text-xs font-medium
-                             group-hover:underline">
-              Watch & Learn →
-            </span>
-          )}
-          {isWatched && !isLocked && (
-            <span className="text-[10px] text-green-600 font-medium">
-              ✅ Completed
-            </span>
-          )}
+          <span className="text-blue-600 text-xs font-medium group-hover:underline">
+            Watch Free →
+          </span>
+          <div className="flex items-center gap-2">
+            {isWatched && (
+              <span className="text-[10px] text-green-600 font-medium">
+                ✅ Watched
+              </span>
+            )}
+            {isFree && (
+              <span className="text-[10px] text-amber-600 font-medium">
+                🔒 AI Chat
+              </span>
+            )}
+          </div>
         </div>
       </div>
-    </div>
-  )
-
-  if (isLocked) {
-    return (
-      <Link to="/pricing" className="block">
-        {cardContent}
-      </Link>
-    )
-  }
-
-  return (
-    <Link to={`/tutorials/${module.id}`} className="block">
-      {cardContent}
     </Link>
   )
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
 export default function Tutorials() {
-  const { progress }                 = useProgress()
-  const { canUse, isFree, isPro }    = useSubscription()
+  const { progress }          = useProgress()
+  const { isFree }            = useSubscription()
 
   const [allModules,  setAllModules]  = useState([])
   const [loading,     setLoading]     = useState(true)
@@ -192,9 +161,6 @@ export default function Tutorials() {
   const [activeTopic, setActiveTopic] = useState(ALL)
   const [sortBy,      setSortBy]      = useState('order')
   const [search,      setSearch]      = useState('')
-
-  // Free users can see first 3 modules only
-  const FREE_PREVIEW_COUNT = 3
 
   // ── Watched module IDs ─────────────────────────────────────────────────────
   const watchedIds = useMemo(
@@ -218,7 +184,7 @@ export default function Tutorials() {
 
   useEffect(() => { loadModules() }, [loadModules])
 
-  // ── Client-side filter + sort + search ────────────────────────────────────
+  // ── Filter + sort + search ─────────────────────────────────────────────────
   const filtered = useMemo(() => {
     let result = [...allModules]
 
@@ -277,17 +243,7 @@ export default function Tutorials() {
     )
   }, [filtered, activeTopic, search])
 
-  // ── Stats ──────────────────────────────────────────────────────────────────
-  const watchedCount   = allModules.filter(m => watchedIds.has(m.id)).length
-  const lockedCount    = isFree
-    ? Math.max(0, allModules.length - FREE_PREVIEW_COUNT)
-    : 0
-
-  // ── Is a module locked for this user ──────────────────────────────────────
-  const isModuleLocked = useCallback((index) => {
-    if (!isFree) return false
-    return index >= FREE_PREVIEW_COUNT
-  }, [isFree])
+  const watchedCount = allModules.filter(m => watchedIds.has(m.id)).length
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto px-4 sm:px-6 lg:px-0">
@@ -299,8 +255,8 @@ export default function Tutorials() {
             Video Tutorials
           </h1>
           <p className="text-slate-500 mt-1 text-sm">
-            AI-powered bar exam lecture courses. Watch and ask the AI
-            questions about any video.
+            All videos are free to watch. Upgrade to Pro to unlock
+            the AI coach on each video.
           </p>
           {!loading && allModules.length > 0 && (
             <p className="text-xs text-slate-400 mt-1">
@@ -309,11 +265,6 @@ export default function Tutorials() {
               {watchedCount > 0 && (
                 <span className="text-green-600 ml-2">
                   • {watchedCount} watched
-                </span>
-              )}
-              {isFree && lockedCount > 0 && (
-                <span className="text-amber-600 ml-2">
-                  • {lockedCount} locked
                 </span>
               )}
             </p>
@@ -336,21 +287,20 @@ export default function Tutorials() {
         )}
       </div>
 
-      {/* ── Free plan banner ── */}
+      {/* ── Free plan info banner ── */}
       {isFree && !loading && allModules.length > 0 && (
-        <div className="bg-gradient-to-r from-amber-50 to-orange-50
-                        border border-amber-200 rounded-2xl p-4
+        <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4
                         flex flex-col sm:flex-row items-start sm:items-center
                         justify-between gap-4">
           <div className="flex items-start gap-3">
-            <span className="text-2xl shrink-0">🔒</span>
+            <span className="text-2xl shrink-0">🎥</span>
             <div>
               <p className="text-sm font-bold text-slate-900">
-                Free Plan — {FREE_PREVIEW_COUNT} of {allModules.length} tutorials available
+                All videos are free to watch!
               </p>
               <p className="text-xs text-slate-500 mt-0.5">
-                Upgrade to Pro to unlock all {allModules.length} tutorials with
-                full AI coaching on every video.
+                Upgrade to Pro to unlock the <strong>AI Coach chat</strong> on
+                every video — ask questions and get answers in real time.
               </p>
             </div>
           </div>
@@ -361,7 +311,7 @@ export default function Tutorials() {
                          text-xs font-bold rounded-xl hover:bg-blue-700
                          transition-colors text-center"
             >
-              Pro — $100/mo →
+              🤖 Unlock AI Chat →
             </Link>
             <Link
               to="/pricing"
@@ -369,7 +319,7 @@ export default function Tutorials() {
                          text-xs font-bold rounded-xl hover:bg-purple-700
                          transition-colors text-center"
             >
-              Bar Ready — $400/yr
+              👑 Bar Ready
             </Link>
           </div>
         </div>
@@ -417,9 +367,7 @@ export default function Tutorials() {
         >
           All Topics
           {!loading && (
-            <span className="ml-1.5 text-xs opacity-70">
-              ({allModules.length})
-            </span>
+            <span className="ml-1.5 text-xs opacity-70">({allModules.length})</span>
           )}
         </button>
 
@@ -531,34 +479,30 @@ export default function Tutorials() {
                 )}
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {topicModules.map((module, index) => {
-                  // Calculate global index for lock check
-                  const globalIndex = filtered.indexOf(module)
-                  return (
-                    <ModuleCard
-                      key={module.id}
-                      module={module}
-                      isWatched={watchedIds.has(module.id)}
-                      isLocked={isModuleLocked(globalIndex)}
-                    />
-                  )
-                })}
+                {topicModules.map(module => (
+                  <ModuleCard
+                    key={module.id}
+                    module={module}
+                    isWatched={watchedIds.has(module.id)}
+                    isFree={isFree}
+                  />
+                ))}
               </div>
             </div>
           ))}
 
-          {/* Upgrade CTA at bottom if free user */}
-          {isFree && lockedCount > 0 && (
+          {/* Upgrade CTA for free users */}
+          {isFree && (
             <div className="bg-gradient-to-r from-blue-600 to-purple-700
                             rounded-2xl p-6 sm:p-8 text-white text-center space-y-4">
-              <div className="text-4xl">🔓</div>
+              <div className="text-4xl">🤖</div>
               <h2 className="text-xl font-black">
-                Unlock All {allModules.length} Tutorials
+                Unlock AI Coach on Every Video
               </h2>
               <p className="text-blue-100 text-sm max-w-md mx-auto">
-                You can preview {FREE_PREVIEW_COUNT} tutorials on the free plan.
-                Upgrade to Pro to watch all lectures with your personal AI coach
-                answering questions in real time.
+                All videos are free to watch. Upgrade to Pro to ask the AI
+                coach questions about any lecture in real time — get instant
+                explanations, quizzes, and legal breakdowns.
               </p>
               <div className="flex justify-center gap-3 flex-wrap">
                 <Link
@@ -581,44 +525,23 @@ export default function Tutorials() {
           )}
         </div>
       ) : (
-        /* Flat grid — filtered or search */
+        /* Flat grid */
         <div>
           {search.trim() && (
             <p className="text-sm text-slate-500 mb-4">
-              {filtered.length} result
-              {filtered.length !== 1 ? 's' : ''} for "{search}"
+              {filtered.length} result{filtered.length !== 1 ? 's' : ''} for "{search}"
             </p>
           )}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filtered.map((module, index) => (
+            {filtered.map(module => (
               <ModuleCard
                 key={module.id}
                 module={module}
                 isWatched={watchedIds.has(module.id)}
-                isLocked={isModuleLocked(index)}
+                isFree={isFree}
               />
             ))}
           </div>
-
-          {/* Upgrade CTA for free users */}
-          {isFree && lockedCount > 0 && (
-            <div className="mt-8 bg-gradient-to-r from-blue-600 to-purple-700
-                            rounded-2xl p-6 text-white text-center space-y-4">
-              <h2 className="text-lg font-black">
-                🔒 {lockedCount} More Tutorials Locked
-              </h2>
-              <p className="text-blue-100 text-sm">
-                Upgrade to Pro to unlock all tutorials.
-              </p>
-              <Link
-                to="/pricing"
-                className="inline-block px-6 py-2.5 bg-white text-blue-700
-                           font-black rounded-2xl hover:bg-blue-50 transition-colors text-sm"
-              >
-                See Plans →
-              </Link>
-            </div>
-          )}
         </div>
       )}
 

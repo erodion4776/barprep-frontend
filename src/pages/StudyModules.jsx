@@ -1,666 +1,549 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import { useParams, Link, useNavigate }  from 'react-router-dom'
-import { apiClient, supabase }           from '../api/client'
-import LoadingSpinner                    from '../components/LoadingSpinner'
-import ReactMarkdown                     from 'react-markdown'
-import { useProgress }                   from '../context/ProgressContext'
-import { useSubscription }               from '../context/SubscriptionContext'
-import { UpgradeBanner }                 from '../components/UpgradePrompt'
+import { useState, useEffect, useMemo, useCallback } from 'react'
+import { Link }            from 'react-router-dom'
+import { apiClient }       from '../api/client'
+import LoadingSpinner      from '../components/LoadingSpinner'
+import { useProgress }     from '../context/ProgressContext'
+import { useSubscription } from '../context/SubscriptionContext'
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-function extractYouTubeId(url) {
-  if (!url) return null
-  const match = url.match(
-    /(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/
-  )
-  return match ? match[1] : null
-}
+const ALL = 'All Topics'
 
-function buildGreeting(moduleData, progress) {
-  const { stats, weakTopics } = progress
-  const isWeak = weakTopics.includes(moduleData.topic)
+const TOPIC_ORDER = [
+  'Constitutional Law', 'Contracts',    'Torts',
+  'Criminal Law',       'Civil Procedure', 'Evidence',
+  'Real Property',      'Business Associations',
+  'Family Law',         'Wills & Trusts',
+]
 
-  let msg = `Hello! I've studied this lecture on **${moduleData.topic}** — "${moduleData.title}".\n\n`
+const SORT_OPTIONS = [
+  { value: 'order',  label: 'Course Order' },
+  { value: 'newest', label: 'Newest First' },
+  { value: 'title',  label: 'A → Z'        },
+]
 
-  if (stats.totalAttempts > 0) {
-    msg += `📊 Your overall accuracy is **${stats.overallAccuracy}%**. `
-    if (isWeak) {
-      msg += `**${moduleData.topic}** is one of your focus areas — let's make the most of this!\n\n`
-    } else {
-      msg += `\n\n`
-    }
-  }
-
-  msg += `I can help you understand the concepts, answer questions, or quiz you. What would you like to know?`
-  return msg
-}
-
-// ── Typing indicator ──────────────────────────────────────────────────────────
-function TypingIndicator() {
+// ── Skeleton card ─────────────────────────────────────────────────────────────
+function SkeletonCard() {
   return (
-    <div className="flex justify-start">
-      <div className="bg-slate-100 rounded-xl rounded-bl-sm px-3 py-2">
-        <div className="flex items-center gap-1">
-          {[0, 1, 2].map(i => (
-            <div
-              key={i}
-              className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce"
-              style={{ animationDelay: `${i * 150}ms` }}
-            />
-          ))}
+    <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden animate-pulse">
+      <div className="aspect-video bg-slate-200" />
+      <div className="p-4 space-y-3">
+        <div className="h-3 bg-slate-200 rounded w-20" />
+        <div className="h-4 bg-slate-200 rounded w-full" />
+        <div className="h-4 bg-slate-200 rounded w-3/4" />
+        <div className="space-y-1.5">
+          <div className="h-3 bg-slate-100 rounded w-full" />
+          <div className="h-3 bg-slate-100 rounded w-5/6" />
         </div>
       </div>
     </div>
   )
 }
 
-// ── Copy button ───────────────────────────────────────────────────────────────
-function CopyButton({ text }) {
-  const [copied, setCopied] = useState(false)
-  const handle = async () => {
-    try {
-      await navigator.clipboard.writeText(text)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    } catch {}
+// ── Thumbnail ─────────────────────────────────────────────────────────────────
+function Thumbnail({ src, alt }) {
+  const [failed, setFailed] = useState(false)
+  if (!src || failed) {
+    return (
+      <div className="w-full h-full flex items-center justify-center
+                      bg-gradient-to-br from-slate-100 to-slate-200">
+        <span className="text-5xl">▶️</span>
+      </div>
+    )
   }
   return (
-    <button
-      onClick={handle}
-      className="text-[10px] text-slate-400 hover:text-slate-600
-                 transition-colors flex items-center gap-1 mt-1"
+    <img
+      src={src}
+      alt={alt}
+      className="w-full h-full object-cover"
+      onError={() => setFailed(true)}
+      loading="lazy"
+    />
+  )
+}
+
+// ── Module card ───────────────────────────────────────────────────────────────
+function ModuleCard({ module, isWatched, isFree }) {
+  return (
+    <Link
+      to={`/tutorials/${module.id}`}
+      className="group bg-white border border-slate-200 rounded-2xl
+                 overflow-hidden hover:shadow-lg hover:border-blue-200
+                 hover:-translate-y-0.5 transition-all duration-200
+                 flex flex-col"
     >
-      {copied ? '✅ Copied' : '📋 Copy'}
-    </button>
-  )
-}
+      {/* Thumbnail */}
+      <div className="relative bg-slate-100 aspect-video overflow-hidden">
+        <Thumbnail src={module.thumbnail_url} alt={module.title} />
 
-// ── YouTube embed ─────────────────────────────────────────────────────────────
-function VideoPlayer({ url, title }) {
-  const youtubeId = extractYouTubeId(url)
-
-  if (!youtubeId) {
-    return (
-      <div className="rounded-xl border-2 border-dashed border-slate-300
-                      bg-slate-50 aspect-video flex items-center
-                      justify-center text-slate-400 text-sm">
-        No video available for this tutorial
-      </div>
-    )
-  }
-
-  return (
-    <div className="rounded-xl overflow-hidden shadow-md bg-black aspect-video">
-      <iframe
-        src={`https://www.youtube.com/embed/${youtubeId}?rel=0`}
-        title={title}
-        className="w-full h-full"
-        allow="accelerometer; autoplay; clipboard-write;
-               encrypted-media; gyroscope; picture-in-picture"
-        allowFullScreen
-      />
-    </div>
-  )
-}
-
-// ── Locked chat overlay ───────────────────────────────────────────────────────
-function LockedChat() {
-  return (
-    <div className="flex-1 flex flex-col items-center justify-center
-                    p-6 text-center space-y-4 bg-slate-50">
-      <div className="text-4xl">🔒</div>
-      <div>
-        <h3 className="font-bold text-slate-900 text-sm">
-          AI Coach is a Pro Feature
-        </h3>
-        <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-          Upgrade to Pro to ask the AI coach questions about this video
-          in real time.
-        </p>
-      </div>
-      <div className="space-y-2 w-full">
-        <Link
-          to="/pricing"
-          className="block w-full py-2.5 bg-blue-600 text-white text-xs
-                     font-bold rounded-xl hover:bg-blue-700 transition-colors
-                     text-center"
-        >
-          🚀 Pro — $100/month
-        </Link>
-        <Link
-          to="/pricing"
-          className="block w-full py-2.5 bg-purple-600 text-white text-xs
-                     font-bold rounded-xl hover:bg-purple-700 transition-colors
-                     text-center"
-        >
-          👑 Bar Ready — $400/year
-        </Link>
-      </div>
-      <p className="text-[10px] text-slate-400">
-        You can still watch the video on the free plan
-      </p>
-    </div>
-  )
-}
-
-// ── Main component ────────────────────────────────────────────────────────────
-export default function ModuleDetail() {
-  const { id }     = useParams()
-  const navigate   = useNavigate()
-  const progress   = useProgress().progress
-  const { markModuleWatched, getProgressSummary } = useProgress()
-  const { canUse, isFree }                        = useSubscription()
-
-  // Can use AI chat on this page
-  const canUseAI = canUse('tutorialDetail')
-
-  const [module,      setModule]      = useState(null)
-  const [nextModule,  setNextModule]  = useState(null)
-  const [loading,     setLoading]     = useState(true)
-  const [errorType,   setErrorType]   = useState(null)
-  const [errorMsg,    setErrorMsg]    = useState('')
-  const [question,    setQuestion]    = useState('')
-  const [chatHistory, setChatHistory] = useState([])
-  const [chatLoading, setChatLoading] = useState(false)
-
-  const chatBottomRef = useRef(null)
-  const inputRef      = useRef(null)
-
-  // ── Restore chat from sessionStorage ──────────────────────────────────────
-  useEffect(() => {
-    if (!canUseAI) return
-    const saved = sessionStorage.getItem(`module_chat_${id}`)
-    if (saved) {
-      try { setChatHistory(JSON.parse(saved)) } catch {}
-    }
-  }, [id, canUseAI])
-
-  // ── Auto-scroll ────────────────────────────────────────────────────────────
-  useEffect(() => {
-    chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [chatHistory, chatLoading])
-
-  // ── Load module ────────────────────────────────────────────────────────────
-  const loadModule = useCallback(async () => {
-    if (progress.loading) return
-
-    setLoading(true)
-    setErrorType(null)
-    setErrorMsg('')
-
-    try {
-      const { data, error: dbError } = await supabase
-        .from('course_modules')
-        .select('*')
-        .eq('id', id)
-        .maybeSingle()
-
-      if (dbError) {
-        setErrorType('network')
-        throw new Error(dbError.message)
-      }
-      if (!data) {
-        setErrorType('not_found')
-        throw new Error('Module not found')
-      }
-
-      setModule(data)
-      await markModuleWatched(data.id, data.title, data.topic)
-
-      // Build greeting only if AI is available and no saved chat
-      if (canUseAI) {
-        const saved = sessionStorage.getItem(`module_chat_${id}`)
-        if (!saved) {
-          const greeting = buildGreeting(data, progress)
-          const initial  = [{ role: 'assistant', content: greeting, isGreeting: true }]
-          setChatHistory(initial)
-          sessionStorage.setItem(`module_chat_${id}`, JSON.stringify(initial))
-        }
-      }
-
-      // Load next module in same topic
-      const { data: siblings } = await supabase
-        .from('course_modules')
-        .select('id, title, topic, order_index')
-        .eq('topic', data.topic)
-        .eq('is_published', true)
-        .order('order_index', { ascending: true })
-
-      if (siblings?.length > 1) {
-        const currentIdx = siblings.findIndex(m => m.id === data.id)
-        if (currentIdx !== -1 && currentIdx < siblings.length - 1) {
-          setNextModule(siblings[currentIdx + 1])
-        }
-      }
-
-    } catch (err) {
-      console.error('Error loading module:', err)
-      setErrorMsg(err.message || 'Unknown error')
-    } finally {
-      setLoading(false)
-    }
-  }, [id, progress.loading, markModuleWatched, canUseAI])
-
-  useEffect(() => {
-    loadModule()
-  }, [loadModule])
-
-  // ── Ask question ───────────────────────────────────────────────────────────
-  const askQuestion = useCallback(async (e) => {
-    e?.preventDefault()
-    const text = question.trim()
-    if (!text || chatLoading || !module || !canUseAI) return
-
-    setQuestion('')
-    setChatLoading(true)
-
-    const withUser = [...chatHistory, { role: 'user', content: text }]
-    setChatHistory(withUser)
-
-    try {
-      // Short context to save tokens
-      const contextMsg = [
-        `[Lecture: "${module.title}" | Topic: ${module.topic}]`,
-        module.ai_summary ? `[Summary: ${module.ai_summary.substring(0, 200)}]` : '',
-        `[Student accuracy: ${progress.stats?.overallAccuracy || 0}%]`,
-        '',
-        `Student question: ${text}`,
-      ].filter(Boolean).join('\n')
-
-      const history = withUser
-        .filter(m => !m.isGreeting)
-        .slice(-6) // Keep last 6 messages to save tokens
-        .map(({ role, content }) => ({ role, content }))
-
-      const res = await apiClient.chat(contextMsg, history)
-
-      const final = [
-        ...withUser,
-        { role: 'assistant', content: res.data.reply || '' },
-      ]
-      setChatHistory(final)
-      sessionStorage.setItem(`module_chat_${id}`, JSON.stringify(final))
-    } catch (err) {
-      const isRateLimit = err.message?.includes('429') ||
-                          err.message?.includes('rate limit')
-
-      const errContent = isRateLimit
-        ? '⏱️ Rate limit hit — please wait a few seconds and try again.'
-        : `Error: ${err.message}. Please try again.`
-
-      const errMsg = [
-        ...withUser,
-        { role: 'assistant', content: errContent },
-      ]
-      setChatHistory(errMsg)
-    } finally {
-      setChatLoading(false)
-      inputRef.current?.focus()
-    }
-  }, [question, chatLoading, module, chatHistory,
-      getProgressSummary, id, canUseAI, progress.stats])
-
-  // ── Derived values ─────────────────────────────────────────────────────────
-  const isWeakTopic   = module ? progress.weakTopics.includes(module.topic)   : false
-  const isStrongTopic = module ? progress.strongTopics.includes(module.topic) : false
-  const topicPerf     = module ? progress.stats.topicPerformance?.[module.topic] : null
-
-  const smartQuickQuestions = useMemo(() => {
-    if (!module || !canUseAI) return []
-    return [
-      isWeakTopic
-        ? `Explain ${module.topic} simply`
-        : `Summarize this lecture`,
-      'Quiz me on this topic',
-      'What are the key rules?',
-      isWeakTopic
-        ? `Common mistakes in ${module.topic}?`
-        : 'What will the bar exam test here?',
-    ]
-  }, [module, isWeakTopic, canUseAI])
-
-  // ── Loading ────────────────────────────────────────────────────────────────
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <LoadingSpinner size="lg" text="Loading tutorial..." />
-      </div>
-    )
-  }
-
-  // ── Error ──────────────────────────────────────────────────────────────────
-  if (errorType || !module) {
-    return (
-      <div className="max-w-md mx-auto text-center py-12 space-y-4">
-        <div className="text-4xl">
-          {errorType === 'not_found' ? '🔍' : '⚠️'}
-        </div>
-        <h2 className="text-lg font-bold text-slate-900">
-          {errorType === 'not_found'
-            ? 'Tutorial Not Found'
-            : 'Failed to Load Tutorial'
-          }
-        </h2>
-        <p className="text-sm text-slate-500">
-          {errorType === 'not_found'
-            ? "This tutorial doesn't exist or has been removed."
-            : `Error: ${errorMsg}`
-          }
-        </p>
-        <Link
-          to="/tutorials"
-          className="inline-block px-6 py-2.5 border border-slate-200
-                     text-slate-700 rounded-xl hover:bg-slate-50
-                     transition-colors text-sm font-medium"
-        >
-          ← Back to Tutorials
-        </Link>
-      </div>
-    )
-  }
-
-  return (
-    <div className="space-y-6 max-w-5xl mx-auto px-4 sm:px-6 lg:px-0">
-
-      {/* ── Breadcrumb ── */}
-      <div className="flex items-center gap-2 text-sm text-slate-500 flex-wrap">
-        <Link to="/"         className="hover:text-blue-600 transition-colors">Home</Link>
-        <span>→</span>
-        <Link to="/tutorials" className="hover:text-blue-600 transition-colors">Tutorials</Link>
-        <span>→</span>
-        <span className="text-slate-700 truncate max-w-[200px]">{module.title}</span>
-      </div>
-
-      {/* ── Module Header ── */}
-      <div className="flex flex-col sm:flex-row sm:items-start
-                      sm:justify-between gap-4">
-        <div className="space-y-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs font-bold px-2 py-0.5 bg-blue-100
-                             text-blue-700 rounded-full">
-              {module.topic}
-            </span>
-            {isWeakTopic && (
-              <span className="text-xs font-bold px-2 py-0.5 bg-amber-100
-                               text-amber-700 rounded-full">
-                ⚠️ Focus Area
-              </span>
-            )}
-            {isStrongTopic && (
-              <span className="text-xs font-bold px-2 py-0.5 bg-green-100
-                               text-green-700 rounded-full">
-                ✅ Strong Area
-              </span>
-            )}
-            {/* Free plan badge */}
-            {isFree && (
-              <span className="text-xs font-bold px-2 py-0.5 bg-slate-100
-                               text-slate-600 rounded-full">
-                Free Preview
-              </span>
-            )}
+        {/* Play overlay */}
+        <div className="absolute inset-0 bg-black/20 flex items-center
+                        justify-center opacity-0 group-hover:opacity-100
+                        transition-opacity duration-200">
+          <div className="w-12 h-12 bg-white/90 rounded-full flex
+                          items-center justify-center shadow-lg">
+            <span className="text-blue-600 text-lg ml-1">▶</span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-black text-slate-900">
-            {module.title}
-          </h1>
         </div>
 
-        {/* Topic performance */}
-        {topicPerf && topicPerf.attempts > 0 && (
-          <div className="bg-white border border-slate-200 rounded-2xl
-                          p-3 text-center shrink-0 min-w-[120px]">
-            <div className={`text-2xl font-extrabold
-              ${topicPerf.accuracy >= 75 ? 'text-green-600'
-                : topicPerf.accuracy >= 50 ? 'text-blue-600'
-                : 'text-amber-600'
-              }`}>
-              {topicPerf.accuracy}%
-            </div>
-            <div className="text-[10px] text-slate-400 uppercase">Your Accuracy</div>
-            <div className="text-xs text-slate-500">{topicPerf.attempts} attempts</div>
+        {/* Watched badge */}
+        {isWatched && (
+          <div className="absolute top-2 right-2 bg-green-500 text-white
+                          text-[10px] font-bold px-2 py-0.5 rounded-full">
+            ✓ Watched
+          </div>
+        )}
+
+        {/* Order index */}
+        {module.order_index !== undefined && (
+          <div className="absolute top-2 left-2 bg-black/50 text-white
+                          text-[10px] font-bold px-2 py-0.5 rounded-full">
+            #{module.order_index + 1}
+          </div>
+        )}
+
+        {/* Free plan AI locked badge */}
+        {isFree && (
+          <div className="absolute bottom-2 right-2 bg-amber-500/90 text-white
+                          text-[10px] font-bold px-2 py-0.5 rounded-full
+                          flex items-center gap-1">
+            🤖 AI Chat — Pro
           </div>
         )}
       </div>
 
-      {/* ── Weak topic alert ── */}
-      {isWeakTopic && (
-        <div className="bg-amber-50 border border-amber-200 rounded-xl
-                        p-4 flex items-start gap-3">
-          <span className="text-xl shrink-0">⚠️</span>
-          <div className="flex-1">
-            <p className="text-sm font-semibold text-amber-900">
-              This is one of your focus areas
-            </p>
-            <p className="text-xs text-amber-700 mt-0.5">
-              {topicPerf?.attempts > 0
-                ? `You're at ${topicPerf.accuracy}% accuracy on ${module.topic}. Watch carefully and use the AI coach.`
-                : `You haven't practiced ${module.topic} yet. After watching, test yourself!`
-              }
-            </p>
-            <div className="flex flex-wrap gap-2 mt-2">
-              <Link
-                to="/mock-exam"
-                className="text-xs bg-amber-600 text-white px-3 py-1
-                           rounded-full hover:bg-amber-700 transition-colors"
-              >
-                Practice Questions →
-              </Link>
-              <Link
-                to="/blog"
-                className="text-xs bg-amber-100 text-amber-800 px-3 py-1
-                           rounded-full hover:bg-amber-200 transition-colors
-                           border border-amber-200"
-              >
-                📰 Read Blog Tips →
-              </Link>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Content */}
+      <div className="p-4 flex flex-col flex-1">
+        <span className="inline-block text-xs font-bold px-2 py-0.5
+                         bg-blue-100 text-blue-700 rounded-full w-fit mb-2">
+          {module.topic}
+        </span>
 
-      {/* ── Free plan AI coach prompt ── */}
-      {isFree && (
-        <UpgradeBanner feature="tutorialDetail" />
-      )}
+        <h3 className="font-semibold text-slate-900 text-sm line-clamp-2 mb-2
+                       group-hover:text-blue-600 transition-colors">
+          {module.title}
+        </h3>
 
-      {/* ── Main Grid ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {module.ai_summary && (
+          <p className="text-xs text-slate-500 line-clamp-3 flex-1">
+            {module.ai_summary}
+          </p>
+        )}
 
-        {/* ── Left column ── */}
-        <div className="lg:col-span-2 space-y-5">
-
-          {/* Video */}
-          <VideoPlayer url={module.video_url} title={module.title} />
-
-          {/* AI Summary */}
-          {module.ai_summary && (
-            <div className="bg-white border border-slate-200 rounded-2xl p-5">
-              <h2 className="text-base font-semibold text-slate-900 mb-3">
-                📋 What You Will Learn
-              </h2>
-              <p className="text-slate-600 text-sm leading-relaxed">
-                {module.ai_summary}
-              </p>
-            </div>
-          )}
-
-          {/* Course Outline */}
-          {module.ai_outline && (
-            <div className="bg-white border border-slate-200 rounded-2xl p-5">
-              <h2 className="text-base font-semibold text-slate-900 mb-3">
-                📚 Course Outline
-              </h2>
-              <div className="prose prose-sm prose-slate max-w-none">
-                <ReactMarkdown>{module.ai_outline}</ReactMarkdown>
-              </div>
-            </div>
-          )}
-
-          {/* Next module */}
-          {nextModule && (
-            <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4
-                            flex items-center justify-between gap-4">
-              <div className="min-w-0">
-                <p className="text-xs font-bold text-blue-600 uppercase mb-1">
-                  Up Next
-                </p>
-                <p className="text-sm font-semibold text-slate-900 truncate">
-                  {nextModule.title}
-                </p>
-              </div>
-              <Link
-                to={`/tutorials/${nextModule.id}`}
-                className="shrink-0 px-4 py-2 bg-blue-600 text-white text-xs
-                           font-bold rounded-xl hover:bg-blue-700 transition-colors"
-              >
-                Next →
-              </Link>
-            </div>
-          )}
-
-          {/* What to do next */}
-          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-3">
-            <h3 className="text-sm font-bold text-slate-700">⚡ What to Do Next</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-              {[
-                { to: '/mock-exam', icon: '📝', title: 'Practice Questions', desc: `Test your ${module.topic} knowledge` },
-                { to: '/chat',      icon: '🤖', title: 'Ask AI Coach',       desc: 'Deep dive into concepts'            },
-                { to: '/blog',      icon: '📰', title: 'Bar Prep Blog',      desc: `Tips on ${module.topic}`            },
-              ].map(({ to, icon, title, desc }) => (
-                <Link
-                  key={to}
-                  to={to}
-                  className="flex items-center gap-2 p-3 bg-white rounded-xl
-                             border border-slate-200 hover:border-blue-300
-                             hover:bg-blue-50 transition-all"
-                >
-                  <span className="text-lg">{icon}</span>
-                  <div>
-                    <div className="font-semibold text-xs text-slate-800">{title}</div>
-                    <div className="text-[10px] text-slate-500">{desc}</div>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* ── Right column: Chat ── */}
-        <div className="lg:col-span-1">
-          <div className="bg-white border border-slate-200 rounded-2xl
-                          flex flex-col h-[500px] lg:h-[600px]
-                          sticky top-20 overflow-hidden">
-
-            {/* Chat header */}
-            <div className="p-4 border-b border-slate-100 bg-slate-50 shrink-0">
-              <h3 className="font-semibold text-slate-900 text-sm">
-                🤖 AI Lecture Coach
-              </h3>
-              <p className="text-xs text-slate-500 mt-0.5">
-                {!canUseAI
-                  ? '🔒 Pro feature — upgrade to ask questions'
-                  : isWeakTopic
-                    ? `⚠️ Focus area — I'll explain carefully`
-                    : 'Ask questions about this lecture'
-                }
-              </p>
-            </div>
-
-            {/* ── Locked state for free users ── */}
-            {!canUseAI ? (
-              <LockedChat />
-            ) : (
-              <>
-                {/* Messages */}
-                <div className="flex-1 overflow-y-auto p-4 space-y-3">
-                  {chatHistory.map((msg, i) => (
-                    <div
-                      key={i}
-                      className={`flex ${
-                        msg.role === 'user' ? 'justify-end' : 'justify-start'
-                      }`}
-                    >
-                      <div className={`
-                        max-w-[90%] rounded-xl px-3 py-2 text-xs leading-relaxed
-                        ${msg.role === 'user'
-                          ? 'bg-blue-600 text-white rounded-br-sm'
-                          : 'bg-slate-100 text-slate-800 rounded-bl-sm'
-                        }
-                      `}>
-                        {msg.role === 'assistant' ? (
-                          <>
-                            <div className="prose prose-xs prose-slate max-w-none">
-                              <ReactMarkdown>{msg.content}</ReactMarkdown>
-                            </div>
-                            <CopyButton text={msg.content} />
-                          </>
-                        ) : (
-                          <p>{msg.content}</p>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-
-                  {chatLoading && <TypingIndicator />}
-                  <div ref={chatBottomRef} />
-                </div>
-
-                {/* Quick questions */}
-                <div className="px-3 py-2 border-t border-slate-100
-                                flex gap-2 overflow-x-auto shrink-0">
-                  {smartQuickQuestions.map(q => (
-                    <button
-                      key={q}
-                      onClick={() => {
-                        setQuestion(q)
-                        inputRef.current?.focus()
-                      }}
-                      className="text-xs bg-slate-50 border border-slate-200
-                                 rounded-full px-3 py-1 whitespace-nowrap
-                                 hover:bg-blue-50 hover:border-blue-300
-                                 text-slate-600 hover:text-blue-700
-                                 transition-colors shrink-0"
-                    >
-                      {q}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Input */}
-                <form
-                  onSubmit={askQuestion}
-                  className="p-3 border-t border-slate-100 flex gap-2 shrink-0"
-                >
-                  <input
-                    ref={inputRef}
-                    type="text"
-                    value={question}
-                    onChange={e => setQuestion(e.target.value)}
-                    placeholder={
-                      isWeakTopic
-                        ? `What confuses you about ${module.topic}?`
-                        : 'Ask about this lecture...'
-                    }
-                    className="flex-1 border border-slate-200 rounded-xl px-3 py-2
-                               text-xs focus:outline-none focus:border-blue-500
-                               transition-colors"
-                    disabled={chatLoading}
-                  />
-                  <button
-                    type="submit"
-                    disabled={chatLoading || !question.trim()}
-                    className="px-3 py-2 bg-blue-600 text-white text-xs font-bold
-                               rounded-xl hover:bg-blue-700 transition-colors
-                               disabled:opacity-60 shrink-0"
-                  >
-                    {chatLoading ? '…' : 'Ask'}
-                  </button>
-                </form>
-              </>
+        <div className="mt-3 flex items-center justify-between">
+          <span className="text-blue-600 text-xs font-medium group-hover:underline">
+            Watch Free →
+          </span>
+          <div className="flex items-center gap-2">
+            {isWatched && (
+              <span className="text-[10px] text-green-600 font-medium">
+                ✅ Watched
+              </span>
+            )}
+            {isFree && (
+              <span className="text-[10px] text-amber-600 font-medium">
+                🔒 AI Chat
+              </span>
             )}
           </div>
         </div>
       </div>
+    </Link>
+  )
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
+export default function Tutorials() {
+  const { progress }          = useProgress()
+  const { isFree }            = useSubscription()
+
+  const [allModules,  setAllModules]  = useState([])
+  const [loading,     setLoading]     = useState(true)
+  const [error,       setError]       = useState('')
+  const [activeTopic, setActiveTopic] = useState(ALL)
+  const [sortBy,      setSortBy]      = useState('order')
+  const [search,      setSearch]      = useState('')
+
+  // ── Watched module IDs ─────────────────────────────────────────────────────
+  const watchedIds = useMemo(
+    () => new Set(progress.watchedModules.map(m => m.module_id || m.id)),
+    [progress.watchedModules]
+  )
+
+  // ── Load ALL modules once ──────────────────────────────────────────────────
+  const loadModules = useCallback(async () => {
+    setLoading(true)
+    setError('')
+    try {
+      const res = await apiClient.getModules('', false)
+      setAllModules(res.data.modules || [])
+    } catch {
+      setError('Failed to load tutorials. Please try again.')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { loadModules() }, [loadModules])
+
+  // ── Filter + sort + search ─────────────────────────────────────────────────
+  const filtered = useMemo(() => {
+    let result = [...allModules]
+
+    if (activeTopic !== ALL) {
+      result = result.filter(m => m.topic === activeTopic)
+    }
+
+    if (search.trim()) {
+      const q = search.toLowerCase()
+      result = result.filter(
+        m =>
+          m.title?.toLowerCase().includes(q) ||
+          m.ai_summary?.toLowerCase().includes(q) ||
+          m.topic?.toLowerCase().includes(q)
+      )
+    }
+
+    if (sortBy === 'newest') {
+      result.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+    } else if (sortBy === 'title') {
+      result.sort((a, b) => a.title?.localeCompare(b.title))
+    } else {
+      result.sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
+    }
+
+    return result
+  }, [allModules, activeTopic, search, sortBy])
+
+  // ── Topic counts ───────────────────────────────────────────────────────────
+  const topicCounts = useMemo(() => {
+    const counts = {}
+    allModules.forEach(m => {
+      counts[m.topic] = (counts[m.topic] || 0) + 1
+    })
+    return counts
+  }, [allModules])
+
+  // ── Grouped view ───────────────────────────────────────────────────────────
+  const grouped = useMemo(() => {
+    if (activeTopic !== ALL || search.trim()) return null
+    const g = {}
+    filtered.forEach(m => {
+      const t = m.topic || 'General'
+      if (!g[t]) g[t] = []
+      g[t].push(m)
+    })
+    return Object.fromEntries(
+      Object.entries(g).sort(([a], [b]) => {
+        const ai = TOPIC_ORDER.indexOf(a)
+        const bi = TOPIC_ORDER.indexOf(b)
+        if (ai === -1 && bi === -1) return a.localeCompare(b)
+        if (ai === -1) return 1
+        if (bi === -1) return -1
+        return ai - bi
+      })
+    )
+  }, [filtered, activeTopic, search])
+
+  const watchedCount = allModules.filter(m => watchedIds.has(m.id)).length
+
+  return (
+    <div className="space-y-6 max-w-6xl mx-auto px-4 sm:px-6 lg:px-0">
+
+      {/* ── Header ── */}
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-black text-slate-900">
+            Video Tutorials
+          </h1>
+          <p className="text-slate-500 mt-1 text-sm">
+            All videos are free to watch. Upgrade to Pro to unlock
+            the AI coach on each video.
+          </p>
+          {!loading && allModules.length > 0 && (
+            <p className="text-xs text-slate-400 mt-1">
+              {allModules.length} tutorial
+              {allModules.length !== 1 ? 's' : ''} available
+              {watchedCount > 0 && (
+                <span className="text-green-600 ml-2">
+                  • {watchedCount} watched
+                </span>
+              )}
+            </p>
+          )}
+        </div>
+
+        {/* Sort */}
+        {!loading && allModules.length > 0 && (
+          <select
+            value={sortBy}
+            onChange={e => setSortBy(e.target.value)}
+            className="border border-slate-200 rounded-xl px-3 py-2 text-sm
+                       text-slate-600 focus:outline-none focus:border-blue-500
+                       bg-white"
+          >
+            {SORT_OPTIONS.map(({ value, label }) => (
+              <option key={value} value={value}>{label}</option>
+            ))}
+          </select>
+        )}
+      </div>
+
+      {/* ── Free plan info banner ── */}
+      {isFree && !loading && allModules.length > 0 && (
+        <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4
+                        flex flex-col sm:flex-row items-start sm:items-center
+                        justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <span className="text-2xl shrink-0">🎥</span>
+            <div>
+              <p className="text-sm font-bold text-slate-900">
+                All videos are free to watch!
+              </p>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Upgrade to Pro to unlock the <strong>AI Coach chat</strong> on
+                every video — ask questions and get answers in real time.
+              </p>
+            </div>
+          </div>
+          <div className="flex gap-2 shrink-0 w-full sm:w-auto">
+            <Link
+              to="/pricing"
+              className="flex-1 sm:flex-none px-4 py-2.5 bg-blue-600 text-white
+                         text-xs font-bold rounded-xl hover:bg-blue-700
+                         transition-colors text-center"
+            >
+              🤖 Unlock AI Chat →
+            </Link>
+            <Link
+              to="/pricing"
+              className="flex-1 sm:flex-none px-4 py-2.5 bg-purple-600 text-white
+                         text-xs font-bold rounded-xl hover:bg-purple-700
+                         transition-colors text-center"
+            >
+              👑 Bar Ready
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {/* ── Search ── */}
+      <div className="relative">
+        <input
+          type="text"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Search tutorials by title, topic, or content…"
+          className="w-full border border-slate-200 rounded-xl pl-10 pr-4
+                     py-2.5 text-sm focus:outline-none focus:border-blue-500
+                     transition-colors bg-white"
+        />
+        <span className="absolute left-3 top-1/2 -translate-y-1/2
+                          text-slate-400 text-sm pointer-events-none">
+          🔍
+        </span>
+        {search && (
+          <button
+            onClick={() => setSearch('')}
+            className="absolute right-3 top-1/2 -translate-y-1/2
+                       text-slate-400 hover:text-slate-600 text-sm"
+          >
+            ✕
+          </button>
+        )}
+      </div>
+
+      {/* ── Topic filter pills ── */}
+      <div className="flex gap-2 overflow-x-auto pb-2 -mx-4 px-4
+                      sm:flex-wrap sm:overflow-visible sm:pb-0 sm:mx-0 sm:px-0">
+        <button
+          onClick={() => setActiveTopic(ALL)}
+          className={`
+            px-4 py-2 rounded-full text-sm font-medium
+            whitespace-nowrap transition-colors shrink-0
+            ${activeTopic === ALL
+              ? 'bg-blue-600 text-white'
+              : 'bg-white border border-slate-200 text-slate-600 hover:border-blue-300'
+            }
+          `}
+        >
+          All Topics
+          {!loading && (
+            <span className="ml-1.5 text-xs opacity-70">({allModules.length})</span>
+          )}
+        </button>
+
+        {TOPIC_ORDER.map(topic => (
+          <button
+            key={topic}
+            onClick={() => setActiveTopic(topic)}
+            disabled={!topicCounts[topic]}
+            className={`
+              px-4 py-2 rounded-full text-sm font-medium
+              whitespace-nowrap transition-colors shrink-0
+              ${activeTopic === topic
+                ? 'bg-blue-600 text-white'
+                : 'bg-white border border-slate-200 text-slate-600 hover:border-blue-300'
+              }
+              ${!topicCounts[topic] ? 'opacity-40 cursor-default' : ''}
+            `}
+          >
+            {topic}
+            {topicCounts[topic] && (
+              <span className="ml-1.5 text-xs opacity-70">
+                ({topicCounts[topic]})
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {/* ── Error ── */}
+      {error && (
+        <div className="p-4 bg-red-50 border border-red-200 rounded-xl
+                        text-red-700 text-sm flex items-center
+                        justify-between gap-3">
+          <span>❌ {error}</span>
+          <button
+            onClick={loadModules}
+            className="text-red-600 hover:underline text-xs font-medium"
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
+      {/* ── Loading skeletons ── */}
+      {loading ? (
+        <div className="space-y-8">
+          {[1, 2].map(g => (
+            <div key={g} className="space-y-4">
+              <div className="h-6 bg-slate-200 rounded w-40 animate-pulse" />
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {[1, 2, 3].map(i => <SkeletonCard key={i} />)}
+              </div>
+            </div>
+          ))}
+        </div>
+
+      /* ── Empty state ── */
+      ) : filtered.length === 0 ? (
+        <div className="bg-white border border-slate-200 rounded-2xl
+                        text-center py-16 space-y-3">
+          {allModules.length === 0 ? (
+            <>
+              <div className="text-4xl">📚</div>
+              <h2 className="text-lg font-semibold text-slate-900">
+                No Tutorials Yet
+              </h2>
+              <p className="text-slate-500 text-sm max-w-md mx-auto">
+                Tutorials will appear here once the admin adds YouTube
+                lecture videos. Check back soon!
+              </p>
+            </>
+          ) : (
+            <>
+              <div className="text-4xl">🔍</div>
+              <h2 className="text-lg font-semibold text-slate-900">
+                No results found
+              </h2>
+              <p className="text-slate-500 text-sm">
+                Try a different search term or topic filter.
+              </p>
+              <button
+                onClick={() => { setSearch(''); setActiveTopic(ALL) }}
+                className="px-4 py-2 text-sm text-blue-600 border
+                           border-blue-200 rounded-xl hover:bg-blue-50
+                           transition-colors"
+              >
+                Clear filters
+              </button>
+            </>
+          )}
+        </div>
+
+      /* ── Modules ── */
+      ) : grouped ? (
+        /* Grouped by topic */
+        <div className="space-y-10">
+          {Object.entries(grouped).map(([topic, topicModules]) => (
+            <div key={topic}>
+              <div className="flex items-center gap-3 mb-4">
+                <h2 className="text-lg font-bold text-slate-900">{topic}</h2>
+                <span className="text-xs font-bold px-2 py-0.5 bg-blue-100
+                                 text-blue-700 rounded-full">
+                  {topicModules.length} video{topicModules.length !== 1 ? 's' : ''}
+                </span>
+                {topicModules.some(m => watchedIds.has(m.id)) && (
+                  <span className="text-xs text-green-600 font-medium">
+                    ✅ {topicModules.filter(m => watchedIds.has(m.id)).length} watched
+                  </span>
+                )}
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {topicModules.map(module => (
+                  <ModuleCard
+                    key={module.id}
+                    module={module}
+                    isWatched={watchedIds.has(module.id)}
+                    isFree={isFree}
+                  />
+                ))}
+              </div>
+            </div>
+          ))}
+
+          {/* Upgrade CTA for free users */}
+          {isFree && (
+            <div className="bg-gradient-to-r from-blue-600 to-purple-700
+                            rounded-2xl p-6 sm:p-8 text-white text-center space-y-4">
+              <div className="text-4xl">🤖</div>
+              <h2 className="text-xl font-black">
+                Unlock AI Coach on Every Video
+              </h2>
+              <p className="text-blue-100 text-sm max-w-md mx-auto">
+                All videos are free to watch. Upgrade to Pro to ask the AI
+                coach questions about any lecture in real time — get instant
+                explanations, quizzes, and legal breakdowns.
+              </p>
+              <div className="flex justify-center gap-3 flex-wrap">
+                <Link
+                  to="/pricing"
+                  className="px-8 py-3 bg-white text-blue-700 font-black
+                             rounded-2xl hover:bg-blue-50 transition-colors text-sm"
+                >
+                  🚀 Pro — $100/month
+                </Link>
+                <Link
+                  to="/pricing"
+                  className="px-8 py-3 bg-purple-500 text-white font-black
+                             rounded-2xl hover:bg-purple-400 transition-colors text-sm
+                             border border-purple-400"
+                >
+                  👑 Bar Ready — $400/year
+                </Link>
+              </div>
+            </div>
+          )}
+        </div>
+      ) : (
+        /* Flat grid */
+        <div>
+          {search.trim() && (
+            <p className="text-sm text-slate-500 mb-4">
+              {filtered.length} result{filtered.length !== 1 ? 's' : ''} for "{search}"
+            </p>
+          )}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filtered.map(module => (
+              <ModuleCard
+                key={module.id}
+                module={module}
+                isWatched={watchedIds.has(module.id)}
+                isFree={isFree}
+              />
+            ))}
+          </div>
+        </div>
+      )}
 
     </div>
   )

@@ -3,8 +3,8 @@ import { Link }         from 'react-router-dom'
 import { apiClient }    from '../api/client'
 import LoadingSpinner   from '../components/LoadingSpinner'
 import { useProgress }  from '../context/ProgressContext'
+import { useSubscription } from '../context/SubscriptionContext'
 
-// ── Constants ─────────────────────────────────────────────────────────────────
 const ALL = 'All Topics'
 
 const TOPIC_ORDER = [
@@ -15,9 +15,9 @@ const TOPIC_ORDER = [
 ]
 
 const SORT_OPTIONS = [
-  { value: 'order',   label: 'Course Order' },
-  { value: 'newest',  label: 'Newest First' },
-  { value: 'title',   label: 'A → Z'        },
+  { value: 'order',  label: 'Course Order' },
+  { value: 'newest', label: 'Newest First' },
+  { value: 'title',  label: 'A → Z'        },
 ]
 
 // ── Skeleton card ─────────────────────────────────────────────────────────────
@@ -58,36 +58,52 @@ function Thumbnail({ src, alt }) {
       alt={alt}
       className="w-full h-full object-cover"
       onError={() => setFailed(true)}
+      loading="lazy"
     />
   )
 }
 
 // ── Module card ───────────────────────────────────────────────────────────────
-function ModuleCard({ module, isWatched }) {
-  return (
-    <Link
-      to={`/tutorials/${module.id}`}
-      className="group bg-white border border-slate-200 rounded-2xl
-                 overflow-hidden hover:shadow-lg hover:border-blue-200
-                 transition-all duration-200 hover:-translate-y-0.5
-                 flex flex-col"
-    >
+function ModuleCard({ module, isWatched, isLocked }) {
+  const cardContent = (
+    <div className={`
+      group bg-white border border-slate-200 rounded-2xl
+      overflow-hidden transition-all duration-200 flex flex-col
+      ${isLocked
+        ? 'opacity-75 cursor-not-allowed'
+        : 'hover:shadow-lg hover:border-blue-200 hover:-translate-y-0.5 cursor-pointer'
+      }
+    `}>
       {/* Thumbnail */}
       <div className="relative bg-slate-100 aspect-video overflow-hidden">
         <Thumbnail src={module.thumbnail_url} alt={module.title} />
 
-        {/* Play overlay */}
-        <div className="absolute inset-0 bg-black/20 flex items-center
-                        justify-center opacity-0 group-hover:opacity-100
-                        transition-opacity duration-200">
-          <div className="w-12 h-12 bg-white/90 rounded-full flex
-                          items-center justify-center shadow-lg">
-            <span className="text-blue-600 text-lg ml-1">▶</span>
+        {/* Lock overlay for free users */}
+        {isLocked && (
+          <div className="absolute inset-0 bg-black/50 flex flex-col
+                          items-center justify-center gap-2">
+            <div className="text-3xl">🔒</div>
+            <div className="bg-blue-600 text-white text-xs font-bold
+                            px-3 py-1.5 rounded-full">
+              Pro Feature
+            </div>
           </div>
-        </div>
+        )}
+
+        {/* Play overlay for unlocked */}
+        {!isLocked && (
+          <div className="absolute inset-0 bg-black/20 flex items-center
+                          justify-center opacity-0 group-hover:opacity-100
+                          transition-opacity duration-200">
+            <div className="w-12 h-12 bg-white/90 rounded-full flex
+                            items-center justify-center shadow-lg">
+              <span className="text-blue-600 text-lg ml-1">▶</span>
+            </div>
+          </div>
+        )}
 
         {/* Watched badge */}
-        {isWatched && (
+        {isWatched && !isLocked && (
           <div className="absolute top-2 right-2 bg-green-500 text-white
                           text-[10px] font-bold px-2 py-0.5 rounded-full
                           flex items-center gap-1">
@@ -95,7 +111,7 @@ function ModuleCard({ module, isWatched }) {
           </div>
         )}
 
-        {/* Order index badge */}
+        {/* Order index */}
         {module.order_index !== undefined && (
           <div className="absolute top-2 left-2 bg-black/50 text-white
                           text-[10px] font-bold px-2 py-0.5 rounded-full">
@@ -111,8 +127,11 @@ function ModuleCard({ module, isWatched }) {
           {module.topic}
         </span>
 
-        <h3 className="font-semibold text-slate-900 text-sm line-clamp-2 mb-2
-                       group-hover:text-blue-600 transition-colors">
+        <h3 className={`font-semibold text-sm line-clamp-2 mb-2
+          ${isLocked
+            ? 'text-slate-500'
+            : 'text-slate-900 group-hover:text-blue-600 transition-colors'
+          }`}>
           {module.title}
         </h3>
 
@@ -123,31 +142,59 @@ function ModuleCard({ module, isWatched }) {
         )}
 
         <div className="mt-3 flex items-center justify-between">
-          <span className="text-blue-600 text-xs font-medium
-                           group-hover:underline">
-            Watch & Learn →
-          </span>
-          {isWatched && (
+          {isLocked ? (
+            <Link
+              to="/pricing"
+              onClick={e => e.stopPropagation()}
+              className="text-xs text-blue-600 font-bold hover:underline"
+            >
+              Upgrade to watch →
+            </Link>
+          ) : (
+            <span className="text-blue-600 text-xs font-medium
+                             group-hover:underline">
+              Watch & Learn →
+            </span>
+          )}
+          {isWatched && !isLocked && (
             <span className="text-[10px] text-green-600 font-medium">
               ✅ Completed
             </span>
           )}
         </div>
       </div>
+    </div>
+  )
+
+  if (isLocked) {
+    return (
+      <Link to="/pricing" className="block">
+        {cardContent}
+      </Link>
+    )
+  }
+
+  return (
+    <Link to={`/tutorials/${module.id}`} className="block">
+      {cardContent}
     </Link>
   )
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
 export default function Tutorials() {
-  const { progress } = useProgress()
+  const { progress }                 = useProgress()
+  const { canUse, isFree, isPro }    = useSubscription()
 
-  const [allModules,   setAllModules]   = useState([])
-  const [loading,      setLoading]      = useState(true)
-  const [error,        setError]        = useState('')
-  const [activeTopic,  setActiveTopic]  = useState(ALL)
-  const [sortBy,       setSortBy]       = useState('order')
-  const [search,       setSearch]       = useState('')
+  const [allModules,  setAllModules]  = useState([])
+  const [loading,     setLoading]     = useState(true)
+  const [error,       setError]       = useState('')
+  const [activeTopic, setActiveTopic] = useState(ALL)
+  const [sortBy,      setSortBy]      = useState('order')
+  const [search,      setSearch]      = useState('')
+
+  // Free users can see first 3 modules only
+  const FREE_PREVIEW_COUNT = 3
 
   // ── Watched module IDs ─────────────────────────────────────────────────────
   const watchedIds = useMemo(
@@ -175,12 +222,10 @@ export default function Tutorials() {
   const filtered = useMemo(() => {
     let result = [...allModules]
 
-    // Topic filter
     if (activeTopic !== ALL) {
       result = result.filter(m => m.topic === activeTopic)
     }
 
-    // Search
     if (search.trim()) {
       const q = search.toLowerCase()
       result = result.filter(
@@ -191,11 +236,8 @@ export default function Tutorials() {
       )
     }
 
-    // Sort
     if (sortBy === 'newest') {
-      result.sort(
-        (a, b) => new Date(b.created_at) - new Date(a.created_at)
-      )
+      result.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
     } else if (sortBy === 'title') {
       result.sort((a, b) => a.title?.localeCompare(b.title))
     } else {
@@ -205,7 +247,7 @@ export default function Tutorials() {
     return result
   }, [allModules, activeTopic, search, sortBy])
 
-  // ── Topic counts from ALL modules ──────────────────────────────────────────
+  // ── Topic counts ───────────────────────────────────────────────────────────
   const topicCounts = useMemo(() => {
     const counts = {}
     allModules.forEach(m => {
@@ -214,7 +256,7 @@ export default function Tutorials() {
     return counts
   }, [allModules])
 
-  // ── Grouped for "All Topics" view ─────────────────────────────────────────
+  // ── Grouped view ───────────────────────────────────────────────────────────
   const grouped = useMemo(() => {
     if (activeTopic !== ALL || search.trim()) return null
     const g = {}
@@ -223,7 +265,6 @@ export default function Tutorials() {
       if (!g[t]) g[t] = []
       g[t].push(m)
     })
-    // Sort groups by TOPIC_ORDER
     return Object.fromEntries(
       Object.entries(g).sort(([a], [b]) => {
         const ai = TOPIC_ORDER.indexOf(a)
@@ -236,15 +277,23 @@ export default function Tutorials() {
     )
   }, [filtered, activeTopic, search])
 
-  // ── Stats ─────────────────────────────────────────────────────────────────
-  const watchedCount = allModules.filter(m => watchedIds.has(m.id)).length
+  // ── Stats ──────────────────────────────────────────────────────────────────
+  const watchedCount   = allModules.filter(m => watchedIds.has(m.id)).length
+  const lockedCount    = isFree
+    ? Math.max(0, allModules.length - FREE_PREVIEW_COUNT)
+    : 0
+
+  // ── Is a module locked for this user ──────────────────────────────────────
+  const isModuleLocked = useCallback((index) => {
+    if (!isFree) return false
+    return index >= FREE_PREVIEW_COUNT
+  }, [isFree])
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto px-4 sm:px-6 lg:px-0">
 
       {/* ── Header ── */}
-      <div className="flex flex-col sm:flex-row sm:items-end
-                      justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-black text-slate-900">
             Video Tutorials
@@ -262,6 +311,11 @@ export default function Tutorials() {
                   • {watchedCount} watched
                 </span>
               )}
+              {isFree && lockedCount > 0 && (
+                <span className="text-amber-600 ml-2">
+                  • {lockedCount} locked
+                </span>
+              )}
             </p>
           )}
         </div>
@@ -271,9 +325,9 @@ export default function Tutorials() {
           <select
             value={sortBy}
             onChange={e => setSortBy(e.target.value)}
-            className="border border-slate-200 rounded-xl px-3 py-2
-                       text-sm text-slate-600 focus:outline-none
-                       focus:border-blue-500 bg-white"
+            className="border border-slate-200 rounded-xl px-3 py-2 text-sm
+                       text-slate-600 focus:outline-none focus:border-blue-500
+                       bg-white"
           >
             {SORT_OPTIONS.map(({ value, label }) => (
               <option key={value} value={value}>{label}</option>
@@ -281,6 +335,45 @@ export default function Tutorials() {
           </select>
         )}
       </div>
+
+      {/* ── Free plan banner ── */}
+      {isFree && !loading && allModules.length > 0 && (
+        <div className="bg-gradient-to-r from-amber-50 to-orange-50
+                        border border-amber-200 rounded-2xl p-4
+                        flex flex-col sm:flex-row items-start sm:items-center
+                        justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <span className="text-2xl shrink-0">🔒</span>
+            <div>
+              <p className="text-sm font-bold text-slate-900">
+                Free Plan — {FREE_PREVIEW_COUNT} of {allModules.length} tutorials available
+              </p>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Upgrade to Pro to unlock all {allModules.length} tutorials with
+                full AI coaching on every video.
+              </p>
+            </div>
+          </div>
+          <div className="flex gap-2 shrink-0 w-full sm:w-auto">
+            <Link
+              to="/pricing"
+              className="flex-1 sm:flex-none px-4 py-2.5 bg-blue-600 text-white
+                         text-xs font-bold rounded-xl hover:bg-blue-700
+                         transition-colors text-center"
+            >
+              Pro — $100/mo →
+            </Link>
+            <Link
+              to="/pricing"
+              className="flex-1 sm:flex-none px-4 py-2.5 bg-purple-600 text-white
+                         text-xs font-bold rounded-xl hover:bg-purple-700
+                         transition-colors text-center"
+            >
+              Bar Ready — $400/yr
+            </Link>
+          </div>
+        </div>
+      )}
 
       {/* ── Search ── */}
       <div className="relative">
@@ -294,7 +387,7 @@ export default function Tutorials() {
                      transition-colors bg-white"
         />
         <span className="absolute left-3 top-1/2 -translate-y-1/2
-                          text-slate-400 text-sm">
+                          text-slate-400 text-sm pointer-events-none">
           🔍
         </span>
         {search && (
@@ -310,8 +403,7 @@ export default function Tutorials() {
 
       {/* ── Topic filter pills ── */}
       <div className="flex gap-2 overflow-x-auto pb-2 -mx-4 px-4
-                      sm:flex-wrap sm:overflow-visible sm:pb-0
-                      sm:mx-0 sm:px-0">
+                      sm:flex-wrap sm:overflow-visible sm:pb-0 sm:mx-0 sm:px-0">
         <button
           onClick={() => setActiveTopic(ALL)}
           className={`
@@ -335,6 +427,7 @@ export default function Tutorials() {
           <button
             key={topic}
             onClick={() => setActiveTopic(topic)}
+            disabled={!topicCounts[topic]}
             className={`
               px-4 py-2 rounded-full text-sm font-medium
               whitespace-nowrap transition-colors shrink-0
@@ -344,7 +437,6 @@ export default function Tutorials() {
               }
               ${!topicCounts[topic] ? 'opacity-40 cursor-default' : ''}
             `}
-            disabled={!topicCounts[topic]}
           >
             {topic}
             {topicCounts[topic] && (
@@ -377,11 +469,8 @@ export default function Tutorials() {
           {[1, 2].map(g => (
             <div key={g} className="space-y-4">
               <div className="h-6 bg-slate-200 rounded w-40 animate-pulse" />
-              <div className="grid grid-cols-1 sm:grid-cols-2
-                              lg:grid-cols-3 gap-4">
-                {[1, 2, 3].map(i => (
-                  <SkeletonCard key={i} />
-                ))}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {[1, 2, 3].map(i => <SkeletonCard key={i} />)}
               </div>
             </div>
           ))}
@@ -425,18 +514,15 @@ export default function Tutorials() {
 
       /* ── Modules ── */
       ) : grouped ? (
-        /* Grouped by topic — All Topics view */
+        /* Grouped by topic */
         <div className="space-y-10">
           {Object.entries(grouped).map(([topic, topicModules]) => (
             <div key={topic}>
               <div className="flex items-center gap-3 mb-4">
-                <h2 className="text-lg font-bold text-slate-900">
-                  {topic}
-                </h2>
-                <span className="text-xs font-bold px-2 py-0.5
-                                 bg-blue-100 text-blue-700 rounded-full">
-                  {topicModules.length} video
-                  {topicModules.length !== 1 ? 's' : ''}
+                <h2 className="text-lg font-bold text-slate-900">{topic}</h2>
+                <span className="text-xs font-bold px-2 py-0.5 bg-blue-100
+                                 text-blue-700 rounded-full">
+                  {topicModules.length} video{topicModules.length !== 1 ? 's' : ''}
                 </span>
                 {topicModules.some(m => watchedIds.has(m.id)) && (
                   <span className="text-xs text-green-600 font-medium">
@@ -444,21 +530,58 @@ export default function Tutorials() {
                   </span>
                 )}
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2
-                              lg:grid-cols-3 gap-4">
-                {topicModules.map(module => (
-                  <ModuleCard
-                    key={module.id}
-                    module={module}
-                    isWatched={watchedIds.has(module.id)}
-                  />
-                ))}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {topicModules.map((module, index) => {
+                  // Calculate global index for lock check
+                  const globalIndex = filtered.indexOf(module)
+                  return (
+                    <ModuleCard
+                      key={module.id}
+                      module={module}
+                      isWatched={watchedIds.has(module.id)}
+                      isLocked={isModuleLocked(globalIndex)}
+                    />
+                  )
+                })}
               </div>
             </div>
           ))}
+
+          {/* Upgrade CTA at bottom if free user */}
+          {isFree && lockedCount > 0 && (
+            <div className="bg-gradient-to-r from-blue-600 to-purple-700
+                            rounded-2xl p-6 sm:p-8 text-white text-center space-y-4">
+              <div className="text-4xl">🔓</div>
+              <h2 className="text-xl font-black">
+                Unlock All {allModules.length} Tutorials
+              </h2>
+              <p className="text-blue-100 text-sm max-w-md mx-auto">
+                You can preview {FREE_PREVIEW_COUNT} tutorials on the free plan.
+                Upgrade to Pro to watch all lectures with your personal AI coach
+                answering questions in real time.
+              </p>
+              <div className="flex justify-center gap-3 flex-wrap">
+                <Link
+                  to="/pricing"
+                  className="px-8 py-3 bg-white text-blue-700 font-black
+                             rounded-2xl hover:bg-blue-50 transition-colors text-sm"
+                >
+                  🚀 Pro — $100/month
+                </Link>
+                <Link
+                  to="/pricing"
+                  className="px-8 py-3 bg-purple-500 text-white font-black
+                             rounded-2xl hover:bg-purple-400 transition-colors text-sm
+                             border border-purple-400"
+                >
+                  👑 Bar Ready — $400/year
+                </Link>
+              </div>
+            </div>
+          )}
         </div>
       ) : (
-        /* Flat grid — filtered topic or search results */
+        /* Flat grid — filtered or search */
         <div>
           {search.trim() && (
             <p className="text-sm text-slate-500 mb-4">
@@ -466,16 +589,36 @@ export default function Tutorials() {
               {filtered.length !== 1 ? 's' : ''} for "{search}"
             </p>
           )}
-          <div className="grid grid-cols-1 sm:grid-cols-2
-                          lg:grid-cols-3 gap-4">
-            {filtered.map(module => (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filtered.map((module, index) => (
               <ModuleCard
                 key={module.id}
                 module={module}
                 isWatched={watchedIds.has(module.id)}
+                isLocked={isModuleLocked(index)}
               />
             ))}
           </div>
+
+          {/* Upgrade CTA for free users */}
+          {isFree && lockedCount > 0 && (
+            <div className="mt-8 bg-gradient-to-r from-blue-600 to-purple-700
+                            rounded-2xl p-6 text-white text-center space-y-4">
+              <h2 className="text-lg font-black">
+                🔒 {lockedCount} More Tutorials Locked
+              </h2>
+              <p className="text-blue-100 text-sm">
+                Upgrade to Pro to unlock all tutorials.
+              </p>
+              <Link
+                to="/pricing"
+                className="inline-block px-6 py-2.5 bg-white text-blue-700
+                           font-black rounded-2xl hover:bg-blue-50 transition-colors text-sm"
+              >
+                See Plans →
+              </Link>
+            </div>
+          )}
         </div>
       )}
 

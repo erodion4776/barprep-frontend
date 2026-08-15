@@ -8,8 +8,10 @@ import LoadingSpinner          from '../components/LoadingSpinner'
 import ReactMarkdown           from 'react-markdown'
 import { useProgress }         from '../context/ProgressContext'
 import { BAR_TOPICS }          from '../context/ProgressContext'
+import { useSubscription }     from '../context/SubscriptionContext'
+import { UpgradeModal }        from '../components/UpgradePrompt'
+import DailyLimitBar           from '../components/DailyLimitBar'
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
 const legacyGrade = (feedbackText, selectedAnswer) => {
   if (!feedbackText || !selectedAnswer) return null
   const text = feedbackText.replace(/<!-- grading: \{.*?\} -->\s*/g, '')
@@ -23,9 +25,9 @@ const legacyGrade = (feedbackText, selectedAnswer) => {
 const parseAttemptGrading = (attempt) => {
   if (attempt.is_correct !== null && attempt.is_correct !== undefined) {
     return {
-      isCorrect:  attempt.is_correct,
-      score:      attempt.score ?? (attempt.is_correct ? 100 : 0),
-      timeTaken:  attempt.time_taken ?? 0,
+      isCorrect: attempt.is_correct,
+      score:     attempt.score ?? (attempt.is_correct ? 100 : 0),
+      timeTaken: attempt.time_taken ?? 0,
     }
   }
   const isCorrect = legacyGrade(attempt.feedback || '', attempt.answer)
@@ -41,7 +43,6 @@ function formatTime(totalSeconds) {
   return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`
 }
 
-// ── Score bar ─────────────────────────────────────────────────────────────────
 function ScoreBar({ value, color = 'bg-blue-500' }) {
   return (
     <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
@@ -53,51 +54,50 @@ function ScoreBar({ value, color = 'bg-blue-500' }) {
   )
 }
 
-// ── Main component ────────────────────────────────────────────────────────────
 export default function MockExam() {
   const { progress, loadProgress } = useProgress()
+  const {
+    isFree,
+    checkLimit,
+    incrementUsage,
+  } = useSubscription()
 
-  // ── Phase & question state ─────────────────────────────────────────────────
-  const [phase,         setPhase]         = useState('select')
-  const [topic,         setTopic]         = useState(BAR_TOPICS[0])
-  const [question,      setQuestion]      = useState('')
-  const [answer,        setAnswer]        = useState('')
-  const [feedback,      setFeedback]      = useState('')
-  const [loading,       setLoading]       = useState(false)
-  const [error,         setError]         = useState('')
-  const [sessionCount,  setSessionCount]  = useState(0)
+  const [phase,        setPhase]        = useState('select')
+  const [topic,        setTopic]        = useState(BAR_TOPICS[0])
+  const [question,     setQuestion]     = useState('')
+  const [answer,       setAnswer]       = useState('')
+  const [feedback,     setFeedback]     = useState('')
+  const [loading,      setLoading]      = useState(false)
+  const [error,        setError]        = useState('')
+  const [sessionCount, setSessionCount] = useState(0)
+  const [showUpgrade,  setShowUpgrade]  = useState(false)
 
-  // ── Grading state ──────────────────────────────────────────────────────────
-  const [correctLetter,    setCorrectLetter]    = useState(null)
-  const [rationale,        setRationale]        = useState('')
-  const [lastIsCorrect,    setLastIsCorrect]    = useState(null)
+  const [correctLetter,     setCorrectLetter]     = useState(null)
+  const [rationale,         setRationale]         = useState('')
+  const [lastIsCorrect,     setLastIsCorrect]     = useState(null)
   const [lastCorrectLetter, setLastCorrectLetter] = useState(null)
-  const [finalTimeTaken,   setFinalTimeTaken]   = useState(0)
+  const [finalTimeTaken,    setFinalTimeTaken]    = useState(0)
 
-  // ── Timer state ────────────────────────────────────────────────────────────
-  const [timeMode,      setTimeMode]      = useState('countdown')
-  const [secondsLeft,   setSecondsLeft]   = useState(108)
-  const [secondsSpent,  setSecondsSpent]  = useState(0)
-  const [timerActive,   setTimerActive]   = useState(false)
+  const [timeMode,     setTimeMode]     = useState('countdown')
+  const [secondsLeft,  setSecondsLeft]  = useState(108)
+  const [secondsSpent, setSecondsSpent] = useState(0)
+  const [timerActive,  setTimerActive]  = useState(false)
 
-  // ── History state ──────────────────────────────────────────────────────────
   const [history,        setHistory]        = useState([])
   const [loadingHistory, setLoadingHistory] = useState(false)
   const [historyLimit,   setHistoryLimit]   = useState(5)
 
   const timerRef = useRef(null)
 
-  // ── Auto-select recommended topic ─────────────────────────────────────────
   useEffect(() => {
     if (progress.recommendedTopics?.length > 0) {
       setTopic(progress.recommendedTopics[0])
     }
   }, [progress.recommendedTopics])
 
-  // ── Load history on mount ──────────────────────────────────────────────────
   useEffect(() => { loadHistory() }, [])
 
-  // ── Keyboard shortcuts for A/B/C/D ────────────────────────────────────────
+  // Keyboard shortcuts
   useEffect(() => {
     if (phase !== 'question') return
     const handler = (e) => {
@@ -111,7 +111,7 @@ export default function MockExam() {
     return () => window.removeEventListener('keydown', handler)
   }, [phase])
 
-  // ── Pause timer on tab switch ──────────────────────────────────────────────
+  // Pause timer on tab switch
   useEffect(() => {
     const onVisibility = () => {
       if (document.hidden) setTimerActive(false)
@@ -121,24 +121,19 @@ export default function MockExam() {
     return () => document.removeEventListener('visibilitychange', onVisibility)
   }, [phase])
 
-  // ── Timer tick ─────────────────────────────────────────────────────────────
+  // Timer tick
   useEffect(() => {
     if (timerRef.current) clearInterval(timerRef.current)
     if (phase !== 'question' || !timerActive) return
-
     timerRef.current = setInterval(() => {
       setSecondsSpent(p => p + 1)
       if (timeMode === 'countdown') {
         setSecondsLeft(p => Math.max(0, p - 1))
       }
     }, 1000)
-
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current)
-    }
+    return () => { if (timerRef.current) clearInterval(timerRef.current) }
   }, [phase, timerActive, timeMode])
 
-  // ── Load history ───────────────────────────────────────────────────────────
   const loadHistory = useCallback(async () => {
     setLoadingHistory(true)
     try {
@@ -158,11 +153,10 @@ export default function MockExam() {
     }
   }, [])
 
-  // ── Derived stats — read from ProgressContext (single source of truth) ─────
-  const stats = progress.stats
-  const topicPerf = stats.topicPerformance
+  const stats       = progress.stats
+  const topicPerf   = stats.topicPerformance
 
-  const testedTopics   = useMemo(() =>
+  const testedTopics = useMemo(() =>
     Object.entries(topicPerf).filter(([, i]) => i.attempts > 0),
     [topicPerf]
   )
@@ -194,6 +188,13 @@ export default function MockExam() {
 
   // ── Generate question ──────────────────────────────────────────────────────
   const generateQuestion = useCallback(async (selectedTopic) => {
+    // ── Check free plan limit ────────────────────────────────────────────
+    const limitCheck = checkLimit('mockQuestions')
+    if (!limitCheck.allowed) {
+      setShowUpgrade(true)
+      return
+    }
+
     const topicToUse = selectedTopic || topic
     setLoading(true)
     setError('')
@@ -222,7 +223,7 @@ export default function MockExam() {
     } finally {
       setLoading(false)
     }
-  }, [topic])
+  }, [topic, checkLimit])
 
   // ── Submit answer ──────────────────────────────────────────────────────────
   const submitAnswer = useCallback(async () => {
@@ -248,6 +249,9 @@ export default function MockExam() {
       setFeedback(fb)
       setPhase('feedback')
 
+      // ── Increment mock question usage ────────────────────────────────
+      await incrementUsage('mockQuestions')
+
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
         await supabase.from('attempts').insert({
@@ -269,9 +273,8 @@ export default function MockExam() {
       setLoading(false)
     }
   }, [answer, question, correctLetter, rationale, topic,
-      secondsSpent, loadHistory, loadProgress])
+      secondsSpent, loadHistory, loadProgress, incrementUsage])
 
-  // ── Reset ──────────────────────────────────────────────────────────────────
   const reset = useCallback(() => {
     setQuestion(''); setAnswer(''); setFeedback('')
     setError(''); setTimerActive(false)
@@ -283,7 +286,15 @@ export default function MockExam() {
   return (
     <div className="space-y-6 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
 
-      {/* ── Header ── */}
+      {/* Upgrade Modal */}
+      {showUpgrade && (
+        <UpgradeModal
+          feature="mockQuestions"
+          onClose={() => setShowUpgrade(false)}
+        />
+      )}
+
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center
                       sm:justify-between gap-4 border-b border-slate-100 pb-5">
         <div>
@@ -291,8 +302,7 @@ export default function MockExam() {
             Mock Exam & Analytics
           </h1>
           <p className="text-slate-500 mt-1 text-sm">
-            Practice with real-time pacing feedback, grading logs,
-            and topic diagnostics.
+            Practice with real-time pacing feedback and topic diagnostics.
           </p>
           {sessionCount > 0 && (
             <p className="text-xs text-blue-600 font-medium mt-1">
@@ -300,45 +310,34 @@ export default function MockExam() {
             </p>
           )}
         </div>
-
         <div className="flex items-center gap-2 flex-wrap">
-          <Link
-            to="/chat"
-            className="text-xs px-3 py-1.5 rounded-full border border-slate-200
-                       text-slate-600 hover:border-blue-300 hover:text-blue-600
-                       transition-colors font-medium"
-          >
+          <Link to="/chat"
+                className="text-xs px-3 py-1.5 rounded-full border border-slate-200
+                           text-slate-600 hover:border-blue-300 hover:text-blue-600
+                           transition-colors font-medium">
             🤖 AI Coach
           </Link>
-          <Link
-            to="/tutorials"
-            className="text-xs px-3 py-1.5 rounded-full border border-slate-200
-                       text-slate-600 hover:border-blue-300 hover:text-blue-600
-                       transition-colors font-medium"
-          >
+          <Link to="/tutorials"
+                className="text-xs px-3 py-1.5 rounded-full border border-slate-200
+                           text-slate-600 hover:border-blue-300 hover:text-blue-600
+                           transition-colors font-medium">
             🎥 Tutorials
           </Link>
-          <Link
-            to="/blog"
-            className="text-xs px-3 py-1.5 rounded-full border border-slate-200
-                       text-slate-600 hover:border-blue-300 hover:text-blue-600
-                       transition-colors font-medium"
-          >
+          <Link to="/blog"
+                className="text-xs px-3 py-1.5 rounded-full border border-slate-200
+                           text-slate-600 hover:border-blue-300 hover:text-blue-600
+                           transition-colors font-medium">
             📰 Blog
           </Link>
-          {phase === 'select' && (
-            <button
-              onClick={() => { loadHistory(); loadProgress() }}
-              className="text-xs px-3 py-1.5 rounded-full border border-slate-200
-                         text-slate-600 hover:bg-slate-50 transition-colors font-medium"
-            >
-              🔄 Refresh
-            </button>
-          )}
         </div>
       </div>
 
-      {/* ── AI Recommendation Banner ── */}
+      {/* Daily limit bar for free users */}
+      {isFree && phase === 'select' && (
+        <DailyLimitBar type="mockQuestions" checkLimit={checkLimit} />
+      )}
+
+      {/* AI Recommendation Banner */}
       {phase === 'select' && progress.recommendedTopics?.length > 0 && (
         <div className="bg-blue-50 border border-blue-200 rounded-xl p-4
                         flex flex-col sm:flex-row sm:items-center gap-3">
@@ -356,8 +355,7 @@ export default function MockExam() {
                 key={t}
                 onClick={() => { setTopic(t); generateQuestion(t) }}
                 className="text-xs bg-blue-600 text-white px-3 py-1.5
-                           rounded-full hover:bg-blue-700 transition-colors
-                           font-medium"
+                           rounded-full hover:bg-blue-700 transition-colors font-medium"
               >
                 {t} →
               </button>
@@ -366,15 +364,13 @@ export default function MockExam() {
         </div>
       )}
 
-      {/* ── Error ── */}
+      {/* Error */}
       {error && (
         <div className="p-4 bg-red-50 border border-red-200 rounded-xl
                         text-red-700 text-sm flex items-center justify-between">
           <span>❌ {error}</span>
-          <button
-            onClick={() => setError('')}
-            className="underline text-xs font-semibold hover:text-red-900"
-          >
+          <button onClick={() => setError('')}
+                  className="underline text-xs font-semibold hover:text-red-900">
             Dismiss
           </button>
         </div>
@@ -390,43 +386,19 @@ export default function MockExam() {
           {stats.totalAttempts > 0 && (
             <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
               {[
-                {
-                  label: 'Questions',
-                  value: stats.totalAttempts,
-                  sub:   'Total answered',
-                  color: 'text-slate-900',
-                },
-                {
-                  label: 'Accuracy',
-                  value: `${stats.overallAccuracy}%`,
-                  sub:   `${stats.totalCorrect} correct`,
-                  color: 'text-blue-600',
-                },
-                {
-                  label: 'Avg Time',
-                  value: stats.averageTime > 0 ? formatTime(stats.averageTime) : 'N/A',
-                  sub:   stats.averageTime > 108
-                    ? '⚠️ Over pace limit'
-                    : '✅ Good pacing',
-                  color: 'text-indigo-600',
-                },
-                {
-                  label: 'Streak',
-                  value: `${stats.currentStreak ?? 0}🔥`,
-                  sub:   `Best: ${stats.longestStreak ?? 0} days`,
-                  color: 'text-orange-500',
-                },
-              ].map(({ label, value, sub, color }) => (
+                { label: 'Questions',  value: stats.totalAttempts,      color: 'text-slate-900'  },
+                { label: 'Accuracy',   value: `${stats.overallAccuracy}%`, color: 'text-blue-600' },
+                { label: 'Avg Time',   value: stats.averageTime > 0 ? formatTime(stats.averageTime) : 'N/A', color: 'text-indigo-600' },
+                { label: 'Streak',     value: `${stats.currentStreak ?? 0}🔥`, color: 'text-orange-500' },
+              ].map(({ label, value, color }) => (
                 <div key={label}
                      className="bg-white border border-slate-200 rounded-xl p-5">
-                  <div className="text-slate-400 text-xs font-semibold
-                                  uppercase tracking-wider">
+                  <div className="text-slate-400 text-xs font-semibold uppercase tracking-wider">
                     {label}
                   </div>
                   <div className={`text-3xl font-extrabold mt-2 ${color}`}>
                     {value}
                   </div>
-                  <div className="text-xs text-slate-500 mt-1">{sub}</div>
                 </div>
               ))}
             </div>
@@ -434,8 +406,7 @@ export default function MockExam() {
 
           {/* Topic performance report */}
           {stats.totalAttempts > 0 && (
-            <div className="bg-slate-50 border border-slate-200 rounded-2xl
-                            p-6 space-y-6">
+            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 space-y-6">
               <div>
                 <h2 className="text-lg font-bold text-slate-900">
                   Topic Performance Report
@@ -444,27 +415,22 @@ export default function MockExam() {
                   Diagnostic based on your historical mock exam scoring.
                 </p>
               </div>
-
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+
                 {/* Strongest */}
                 <div className="bg-white p-4 rounded-xl border border-green-100 space-y-3">
                   <h3 className="text-xs font-bold text-green-700 uppercase tracking-wider">
                     🏆 Strongest (≥75%)
                   </h3>
                   {strongestAreas.length === 0 ? (
-                    <p className="text-xs text-slate-400 italic py-2">
-                      No areas in master zone yet.
-                    </p>
+                    <p className="text-xs text-slate-400 italic py-2">No areas in master zone yet.</p>
                   ) : (
                     <div className="space-y-2.5">
                       {strongestAreas.map(item => (
                         <div key={item.name} className="space-y-1">
-                          <div className="flex justify-between text-xs
-                                          font-medium text-slate-800">
+                          <div className="flex justify-between text-xs font-medium text-slate-800">
                             <span>{item.name}</span>
-                            <span className="text-green-600">
-                              {item.accuracy}%
-                            </span>
+                            <span className="text-green-600">{item.accuracy}%</span>
                           </div>
                           <ScoreBar value={item.accuracy} color="bg-green-500" />
                         </div>
@@ -479,19 +445,14 @@ export default function MockExam() {
                     📈 Improving (50–74%)
                   </h3>
                   {improvingAreas.length === 0 ? (
-                    <p className="text-xs text-slate-400 italic py-2">
-                      No topics in intermediate zone.
-                    </p>
+                    <p className="text-xs text-slate-400 italic py-2">No topics in intermediate zone.</p>
                   ) : (
                     <div className="space-y-2.5">
                       {improvingAreas.map(item => (
                         <div key={item.name} className="space-y-1">
-                          <div className="flex justify-between text-xs
-                                          font-medium text-slate-800">
+                          <div className="flex justify-between text-xs font-medium text-slate-800">
                             <span>{item.name}</span>
-                            <span className="text-blue-600">
-                              {item.accuracy}%
-                            </span>
+                            <span className="text-blue-600">{item.accuracy}%</span>
                           </div>
                           <ScoreBar value={item.accuracy} color="bg-blue-500" />
                         </div>
@@ -506,38 +467,25 @@ export default function MockExam() {
                     ⚠️ Focus (&lt;50% / untested)
                   </h3>
                   {focusAreas.length === 0 ? (
-                    <p className="text-xs text-slate-400 italic py-2">
-                      All topics in good shape!
-                    </p>
+                    <p className="text-xs text-slate-400 italic py-2">All topics in good shape!</p>
                   ) : (
                     <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
                       {focusAreas.slice(0, 6).map(item => (
-                        <div
-                          key={item.name}
-                          className="flex justify-between items-center text-xs
-                                     text-slate-700 py-1 border-b border-slate-50
-                                     last:border-0"
-                        >
+                        <div key={item.name}
+                             className="flex justify-between items-center text-xs
+                                        text-slate-700 py-1 border-b border-slate-50 last:border-0">
                           <button
                             onClick={() => setTopic(item.name)}
-                            className="font-medium hover:text-blue-600
-                                       transition-colors text-left truncate max-w-[140px]"
+                            className="font-medium hover:text-blue-600 transition-colors
+                                       text-left truncate max-w-[140px]"
                           >
                             {item.name}
                           </button>
                           <span className="text-slate-400 shrink-0">
-                            {item.attempts > 0
-                              ? `${item.accuracy}%`
-                              : 'Untested'
-                            }
+                            {item.attempts > 0 ? `${item.accuracy}%` : 'Untested'}
                           </span>
                         </div>
                       ))}
-                      {focusAreas.length > 6 && (
-                        <p className="text-[10px] text-slate-400 text-center pt-1">
-                          +{focusAreas.length - 6} more to practice
-                        </p>
-                      )}
                     </div>
                   )}
                 </div>
@@ -554,9 +502,8 @@ export default function MockExam() {
                       <Link
                         key={t}
                         to="/tutorials"
-                        className="text-xs bg-white border border-amber-200
-                                   text-amber-700 px-3 py-1 rounded-full
-                                   hover:bg-amber-50 transition-colors font-medium"
+                        className="text-xs bg-white border border-amber-200 text-amber-700
+                                   px-3 py-1 rounded-full hover:bg-amber-50 transition-colors"
                       >
                         🎥 {t}
                       </Link>
@@ -638,8 +585,8 @@ export default function MockExam() {
             <button
               onClick={() => generateQuestion(topic)}
               disabled={loading}
-              className="w-full py-3 min-h-[48px] bg-blue-600 text-white
-                         font-bold rounded-xl hover:bg-blue-700 transition-colors
+              className="w-full py-3 min-h-[48px] bg-blue-600 text-white font-bold
+                         rounded-xl hover:bg-blue-700 transition-colors
                          disabled:opacity-60 flex items-center justify-center gap-2"
             >
               {loading
@@ -656,15 +603,13 @@ export default function MockExam() {
                 <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">
                   Practice Log ({history.length} total)
                 </h3>
-                {loadingHistory && (
-                  <LoadingSpinner size="sm" text="Updating…" />
-                )}
+                {loadingHistory && <LoadingSpinner size="sm" text="Updating…" />}
               </div>
 
               <div className="space-y-3">
                 {history.slice(0, historyLimit).map((attempt, i) => {
-                  const g          = parseAttemptGrading(attempt)
-                  const dotColor   = g.isCorrect === null
+                  const g        = parseAttemptGrading(attempt)
+                  const dotColor = g.isCorrect === null
                     ? 'bg-slate-300'
                     : g.isCorrect ? 'bg-green-500' : 'bg-red-500'
                   const badgeStyle = g.isCorrect === null
@@ -680,8 +625,8 @@ export default function MockExam() {
                                  hover:border-slate-300 rounded-xl overflow-hidden
                                  transition-all"
                     >
-                      <summary className="flex items-center justify-between
-                                          p-4 cursor-pointer select-none list-none">
+                      <summary className="flex items-center justify-between p-4
+                                          cursor-pointer select-none list-none">
                         <div className="flex items-center gap-3">
                           <span className={`w-3 h-3 rounded-full shrink-0 ${dotColor}`} />
                           <div>
@@ -700,8 +645,7 @@ export default function MockExam() {
                         <div className="flex items-center gap-3">
                           <span className={`text-xs font-bold px-2.5 py-1
                                            rounded-full ${badgeStyle}`}>
-                            {g.isCorrect === null
-                              ? 'Ungraded'
+                            {g.isCorrect === null ? 'Ungraded'
                               : g.isCorrect ? 'Correct' : 'Incorrect'
                             }
                           </span>
@@ -717,8 +661,7 @@ export default function MockExam() {
                         </div>
                       </summary>
 
-                      <div className="p-4 border-t border-slate-100 bg-slate-50
-                                      space-y-4 text-sm text-slate-700">
+                      <div className="p-4 border-t border-slate-100 bg-slate-50 space-y-4">
                         <div>
                           <h4 className="text-xs font-bold text-slate-400 uppercase mb-1">
                             Question
@@ -756,13 +699,12 @@ export default function MockExam() {
                 })}
               </div>
 
-              {/* Load more */}
               {history.length > historyLimit && (
                 <button
                   onClick={() => setHistoryLimit(l => l + 5)}
-                  className="w-full py-2 text-sm text-slate-500
-                             hover:text-slate-700 border border-slate-200
-                             rounded-xl hover:bg-slate-50 transition-colors"
+                  className="w-full py-2 text-sm text-slate-500 hover:text-slate-700
+                             border border-slate-200 rounded-xl hover:bg-slate-50
+                             transition-colors"
                 >
                   Load more ({history.length - historyLimit} remaining)
                 </button>
@@ -776,35 +718,28 @@ export default function MockExam() {
           PHASE: QUESTION
       ══════════════════════════════════════════ */}
       {phase === 'question' && question && (
-        <div className="bg-white border border-slate-200 rounded-2xl
-                        p-6 space-y-6">
+        <div className="bg-white border border-slate-200 rounded-2xl p-6 space-y-6">
 
           {/* Topic + timer */}
           <div className="flex items-center justify-between flex-wrap gap-3
                           border-b border-slate-100 pb-4">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs font-bold px-3 py-1 bg-blue-100
-                               text-blue-700 rounded-full">
+              <span className="text-xs font-bold px-3 py-1 bg-blue-100 text-blue-700 rounded-full">
                 {topic}
               </span>
               {isCurrentWeak && (
-                <span className="text-xs font-bold px-2 py-1 bg-amber-100
-                                 text-amber-700 rounded-full">
+                <span className="text-xs font-bold px-2 py-1 bg-amber-100 text-amber-700 rounded-full">
                   ⚠️ Focus Area
                 </span>
               )}
               {isCurrentStrong && (
-                <span className="text-xs font-bold px-2 py-1 bg-green-100
-                                 text-green-700 rounded-full">
+                <span className="text-xs font-bold px-2 py-1 bg-green-100 text-green-700 rounded-full">
                   ✅ Strong Area
                 </span>
               )}
-              <span className="text-slate-400 text-xs">
-                Q#{sessionCount}
-              </span>
+              <span className="text-slate-400 text-xs">Q#{sessionCount}</span>
             </div>
 
-            {/* Timer */}
             <div className="flex items-center gap-3 bg-slate-50 px-3.5 py-1.5
                             rounded-xl border border-slate-200">
               <button
@@ -831,8 +766,7 @@ export default function MockExam() {
 
           {/* Question text */}
           <div className="prose prose-slate max-w-none text-slate-800 text-sm
-                          leading-relaxed bg-slate-50 p-4 rounded-xl
-                          border border-slate-100">
+                          leading-relaxed bg-slate-50 p-4 rounded-xl border border-slate-100">
             <ReactMarkdown>{question}</ReactMarkdown>
           </div>
 
@@ -840,7 +774,8 @@ export default function MockExam() {
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <p className="text-xs font-bold text-slate-400 uppercase tracking-wide">
-                Select your answer: <span className="font-normal normal-case text-slate-300">
+                Select your answer:{' '}
+                <span className="font-normal normal-case text-slate-300">
                   (or press A / B / C / D)
                 </span>
               </p>
@@ -887,8 +822,8 @@ export default function MockExam() {
             <button
               onClick={submitAnswer}
               disabled={!answer || loading}
-              className="flex-1 py-3 min-h-[48px] bg-blue-600 text-white
-                         font-bold rounded-xl hover:bg-blue-700 transition-colors
+              className="flex-1 py-3 min-h-[48px] bg-blue-600 text-white font-bold
+                         rounded-xl hover:bg-blue-700 transition-colors
                          disabled:opacity-60 flex items-center justify-center gap-2"
             >
               {loading
@@ -982,25 +917,19 @@ export default function MockExam() {
                   Strengthen your {topic} knowledge
                 </p>
                 <div className="flex gap-2 mt-3 flex-wrap">
-                  <Link
-                    to="/tutorials"
-                    className="text-xs bg-amber-600 text-white px-3 py-1.5
-                               rounded-full hover:bg-amber-700 transition-colors"
-                  >
+                  <Link to="/tutorials"
+                        className="text-xs bg-amber-600 text-white px-3 py-1.5
+                                   rounded-full hover:bg-amber-700 transition-colors">
                     🎥 Watch Tutorial →
                   </Link>
-                  <Link
-                    to="/chat"
-                    className="text-xs border border-amber-300 text-amber-800
-                               px-3 py-1.5 rounded-full hover:bg-amber-50 transition-colors"
-                  >
+                  <Link to="/chat"
+                        className="text-xs border border-amber-300 text-amber-800
+                                   px-3 py-1.5 rounded-full hover:bg-amber-50 transition-colors">
                     🤖 Ask AI Coach →
                   </Link>
-                  <Link
-                    to="/blog"
-                    className="text-xs border border-amber-300 text-amber-800
-                               px-3 py-1.5 rounded-full hover:bg-amber-50 transition-colors"
-                  >
+                  <Link to="/blog"
+                        className="text-xs border border-amber-300 text-amber-800
+                                   px-3 py-1.5 rounded-full hover:bg-amber-50 transition-colors">
                     📰 Read Blog Tips →
                   </Link>
                 </div>
@@ -1026,9 +955,8 @@ export default function MockExam() {
                       setTopic(progress.weakTopics[0])
                       generateQuestion(progress.weakTopics[0])
                     }}
-                    className="mt-2 text-xs bg-emerald-600 text-white
-                               px-3 py-1.5 rounded-full hover:bg-emerald-700
-                               transition-colors"
+                    className="mt-2 text-xs bg-emerald-600 text-white px-3 py-1.5
+                               rounded-full hover:bg-emerald-700 transition-colors"
                   >
                     Practice {progress.weakTopics[0]} →
                   </button>
@@ -1042,8 +970,8 @@ export default function MockExam() {
             <button
               onClick={() => generateQuestion(topic)}
               disabled={loading}
-              className="flex-1 py-3 min-h-[48px] bg-blue-600 text-white
-                         font-bold rounded-xl hover:bg-blue-700 transition-colors
+              className="flex-1 py-3 min-h-[48px] bg-blue-600 text-white font-bold
+                         rounded-xl hover:bg-blue-700 transition-colors
                          disabled:opacity-60 flex items-center justify-center gap-2"
             >
               {loading
@@ -1061,6 +989,7 @@ export default function MockExam() {
           </div>
         </div>
       )}
+
     </div>
   )
 }

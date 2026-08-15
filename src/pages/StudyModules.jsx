@@ -3,6 +3,8 @@ import { Link }                from 'react-router-dom'
 import { apiClient, supabase } from '../api/client'
 import LoadingSpinner          from '../components/LoadingSpinner'
 import { useProgress }         from '../context/ProgressContext'
+import { useSubscription }     from '../context/SubscriptionContext'
+import { UpgradeBanner }       from '../components/UpgradePrompt'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const TOPICS = [
@@ -33,7 +35,7 @@ const FOCUS_COLORS = {
   mixed:      'border-l-blue-500   bg-blue-50',
 }
 
-// ── JSON parse helpers ────────────────────────────────────────────────────────
+// ── JSON parse helper ─────────────────────────────────────────────────────────
 function safeParseJSON(raw) {
   const match = raw.match(/\{[\s\S]*\}/)
   if (!match) throw new Error('No JSON found in response.')
@@ -98,9 +100,33 @@ function AssignmentSkeleton() {
   )
 }
 
+// ── Locked feature placeholder ────────────────────────────────────────────────
+function LockedFeature({ feature, title, desc }) {
+  return (
+    <div className="space-y-4">
+      <UpgradeBanner feature={feature} />
+      <div className="bg-slate-50 border-2 border-dashed border-slate-200
+                      rounded-2xl p-8 text-center space-y-3">
+        <div className="text-4xl">🔒</div>
+        <h3 className="font-bold text-slate-700">{title}</h3>
+        <p className="text-slate-500 text-sm">{desc}</p>
+        <Link
+          to="/pricing"
+          className="inline-block px-6 py-2.5 bg-blue-600 text-white
+                     font-bold text-sm rounded-xl hover:bg-blue-700
+                     transition-colors"
+        >
+          Upgrade to Pro — $100/mo →
+        </Link>
+      </div>
+    </div>
+  )
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 export default function StudyModules() {
   const { progress, getProgressSummary } = useProgress()
+  const { canUse, isFree }               = useSubscription()
 
   // ── Tabs ───────────────────────────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState('planner')
@@ -130,14 +156,14 @@ export default function StudyModules() {
 
   const fileInputRef = useRef(null)
 
-  // ── Days until exam — memoized ─────────────────────────────────────────────
+  // ── Days until exam ────────────────────────────────────────────────────────
   const daysLeft = useMemo(() => {
     if (!examDate) return null
     const diff = new Date(examDate) - new Date()
     return Math.ceil(diff / 86400000)
   }, [examDate])
 
-  // ── Today's plan index — memoized ─────────────────────────────────────────
+  // ── Today's plan ───────────────────────────────────────────────────────────
   const todayIndex = useMemo(() => {
     if (!studyPlan?.generatedAt) return 0
     return Math.floor(
@@ -170,18 +196,19 @@ export default function StudyModules() {
     }
   }, [])
 
-  useEffect(() => { loadPastAssignments() }, [loadPastAssignments])
+  useEffect(() => {
+    if (canUse('assignments')) {
+      loadPastAssignments()
+    }
+  }, [loadPastAssignments, canUse])
 
   // ── Generate study plan ────────────────────────────────────────────────────
   const generateStudyPlan = useCallback(async (force = false) => {
-    if (!examDate)      { setPlanError('Please enter your bar exam date.'); return }
-    if (daysLeft <= 0)  { setPlanError('Your exam date has already passed.'); return }
+    if (!examDate)     { setPlanError('Please enter your bar exam date.'); return }
+    if (daysLeft <= 0) { setPlanError('Your exam date has already passed.'); return }
 
-    // Confirm before overwriting existing plan
     if (studyPlan && !force) {
-      const ok = window.confirm(
-        'This will replace your existing study plan. Continue?'
-      )
+      const ok = window.confirm('This will replace your existing study plan. Continue?')
       if (!ok) return
     }
 
@@ -251,13 +278,12 @@ export default function StudyModules() {
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
         await supabase.from('study_plans').upsert({
-          user_id:    user.id,
-          plan:       plan,
-          exam_date:  examDate,
-          created_at: new Date().toISOString(),
+          user_id:   user.id,
+          plan,
+          exam_date: examDate,
+          updated_at: new Date().toISOString(),
         }, { onConflict: 'user_id' })
       }
-
     } catch (err) {
       console.error('Plan generation error:', err)
       setPlanError(err.message || 'Failed to generate plan. Please try again.')
@@ -273,8 +299,8 @@ export default function StudyModules() {
       reject(new Error('File too large. Maximum size is 5MB.'))
       return
     }
-    const reader  = new FileReader()
-    reader.onload = e => resolve(e.target.result)
+    const reader   = new FileReader()
+    reader.onload  = e => resolve(e.target.result)
     reader.onerror = () => reject(new Error('Failed to read file.'))
     reader.readAsText(file)
   })
@@ -347,7 +373,6 @@ export default function StudyModules() {
 
       setAnalysisResult(analysis)
 
-      // Save to Supabase
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
         const { error: saveErr } = await supabase
@@ -389,8 +414,7 @@ export default function StudyModules() {
 
       {/* ── Header ── */}
       <div className="flex flex-col sm:flex-row sm:items-center
-                      sm:justify-between gap-3 pb-5
-                      border-b border-slate-100">
+                      sm:justify-between gap-3 pb-5 border-b border-slate-100">
         <div>
           <h1 className="text-2xl sm:text-3xl font-black text-slate-900">
             Study Center
@@ -418,13 +442,11 @@ export default function StudyModules() {
               }`}>
               {daysLeft > 0 ? daysLeft : '🎓'}
             </div>
-            <div className="text-xs font-bold text-slate-500
-                            uppercase tracking-wide">
+            <div className="text-xs font-bold text-slate-500 uppercase tracking-wide">
               {daysLeft > 0 ? 'Days Until Exam' : 'Exam Day!'}
             </div>
             {daysLeft <= 14 && daysLeft > 0 && (
-              <div className="text-[10px] text-red-600 font-bold
-                              mt-1 animate-pulse">
+              <div className="text-[10px] text-red-600 font-bold mt-1 animate-pulse">
                 Final stretch! 🔥
               </div>
             )}
@@ -436,39 +458,58 @@ export default function StudyModules() {
       {progress.stats?.totalAttempts > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {[
-            {
-              label: 'Questions',
-              value: progress.stats.totalAttempts,
-              color: 'text-slate-900',
-            },
-            {
-              label: 'Accuracy',
-              value: `${progress.stats.overallAccuracy}%`,
-              color: 'text-blue-600',
-            },
-            {
-              label: 'Streak',
-              value: `${progress.stats.currentStreak ?? 0}🔥`,
-              color: 'text-orange-500',
-            },
-            {
-              label: 'Focus Topics',
-              value: progress.weakTopics?.length || 0,
-              color: 'text-amber-600',
-            },
+            { label: 'Questions',   value: progress.stats.totalAttempts,      color: 'text-slate-900'  },
+            { label: 'Accuracy',    value: `${progress.stats.overallAccuracy}%`, color: 'text-blue-600' },
+            { label: 'Streak',      value: `${progress.stats.currentStreak ?? 0}🔥`, color: 'text-orange-500' },
+            { label: 'Focus Topics',value: progress.weakTopics?.length || 0,  color: 'text-amber-600'  },
           ].map(({ label, value, color }) => (
             <div key={label}
-                 className="bg-white border border-slate-200 rounded-xl
-                             p-3 text-center">
-              <div className={`text-xl font-extrabold ${color}`}>
-                {value}
-              </div>
-              <div className="text-[10px] text-slate-500 mt-0.5
-                              uppercase font-semibold">
+                 className="bg-white border border-slate-200 rounded-xl p-3 text-center">
+              <div className={`text-xl font-extrabold ${color}`}>{value}</div>
+              <div className="text-[10px] text-slate-500 mt-0.5 uppercase font-semibold">
                 {label}
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* ── Free plan upgrade prompt ── */}
+      {isFree && (
+        <div className="bg-gradient-to-r from-blue-50 to-purple-50
+                        border border-blue-200 rounded-2xl p-4
+                        flex flex-col sm:flex-row items-start sm:items-center
+                        justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <span className="text-2xl">🔒</span>
+            <div>
+              <p className="text-sm font-bold text-slate-900">
+                Unlock the Full Study Center
+              </p>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Free plan has limited access. Upgrade to Pro for personalized
+                study plans, assignment grading, and advanced analytics.
+              </p>
+            </div>
+          </div>
+          <div className="flex gap-2 shrink-0 w-full sm:w-auto">
+            <Link
+              to="/pricing"
+              className="flex-1 sm:flex-none px-4 py-2 bg-blue-600 text-white
+                         text-xs font-bold rounded-xl hover:bg-blue-700
+                         transition-colors text-center"
+            >
+              Pro — $100/mo →
+            </Link>
+            <Link
+              to="/pricing"
+              className="flex-1 sm:flex-none px-4 py-2 bg-purple-600 text-white
+                         text-xs font-bold rounded-xl hover:bg-purple-700
+                         transition-colors text-center"
+            >
+              Bar Ready — $400/yr
+            </Link>
+          </div>
         </div>
       )}
 
@@ -498,8 +539,7 @@ export default function StudyModules() {
         <div className="space-y-6">
 
           {/* Exam date input */}
-          <div className="bg-white border border-slate-200 rounded-2xl
-                          p-6 space-y-4">
+          <div className="bg-white border border-slate-200 rounded-2xl p-6 space-y-4">
             <h2 className="text-lg font-bold text-slate-900">
               📅 Set Your Bar Exam Date
             </h2>
@@ -519,38 +559,55 @@ export default function StudyModules() {
                   value={examDate}
                   min={new Date().toISOString().split('T')[0]}
                   onChange={e => setExamDate(e.target.value)}
-                  className="w-full border border-slate-200 rounded-xl
-                             px-4 py-2.5 text-sm focus:outline-none
-                             focus:border-blue-500 transition-colors"
+                  className="w-full border border-slate-200 rounded-xl px-4 py-2.5
+                             text-sm focus:outline-none focus:border-blue-500
+                             transition-colors"
                 />
               </div>
               <div className="sm:self-end">
-                <button
-                  onClick={() => generateStudyPlan(false)}
-                  disabled={planLoading || !examDate}
-                  className="w-full sm:w-auto px-6 min-h-[44px]
-                             bg-blue-600 text-white font-bold rounded-xl
-                             hover:bg-blue-700 transition-colors
-                             disabled:opacity-60 flex items-center gap-2"
-                >
-                  {planLoading
-                    ? <><LoadingSpinner size="sm" color="white" /> Building…</>
-                    : '🤖 Generate AI Plan'
-                  }
-                </button>
+                {/* ── Gate study plan behind Pro ── */}
+                {!canUse('studyPlan') ? (
+                  <button
+                    disabled
+                    onClick={() => {}}
+                    className="w-full sm:w-auto px-6 min-h-[44px] bg-slate-100
+                               text-slate-400 font-bold rounded-xl
+                               cursor-not-allowed flex items-center gap-2 text-sm"
+                  >
+                    🔒 Generate Plan — Pro Only
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => generateStudyPlan(false)}
+                    disabled={planLoading || !examDate}
+                    className="w-full sm:w-auto px-6 min-h-[44px] bg-blue-600
+                               text-white font-bold rounded-xl hover:bg-blue-700
+                               transition-colors disabled:opacity-60
+                               flex items-center gap-2"
+                  >
+                    {planLoading
+                      ? <><LoadingSpinner size="sm" color="white" /> Building…</>
+                      : '🤖 Generate AI Plan'
+                    }
+                  </button>
+                )}
               </div>
             </div>
 
             {planError && (
-              <div className="p-3 bg-red-50 border border-red-200
-                              rounded-xl text-red-700 text-sm">
+              <div className="p-3 bg-red-50 border border-red-200 rounded-xl
+                              text-red-700 text-sm">
                 ❌ {planError}
               </div>
             )}
 
-            {progress.weakTopics?.length > 0 && (
-              <div className="bg-amber-50 border border-amber-200
-                              rounded-xl p-4">
+            {/* Locked state banner */}
+            {!canUse('studyPlan') && (
+              <UpgradeBanner feature="studyPlan" />
+            )}
+
+            {progress.weakTopics?.length > 0 && canUse('studyPlan') && (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
                 <p className="text-xs font-bold text-amber-800 uppercase
                                tracking-wide mb-2">
                   ⚠️ AI will prioritize these weak topics:
@@ -570,22 +627,18 @@ export default function StudyModules() {
           </div>
 
           {/* Today's Focus */}
-          {studyPlan && todaysPlan && (
-            <div className="bg-blue-600 text-white p-6 rounded-2xl
-                            space-y-4">
-              <div className="flex items-center justify-between
-                              flex-wrap gap-2">
+          {studyPlan && todaysPlan && canUse('studyPlan') && (
+            <div className="bg-blue-600 text-white p-6 rounded-2xl space-y-4">
+              <div className="flex items-center justify-between flex-wrap gap-2">
                 <div>
-                  <p className="text-blue-200 text-xs font-bold
-                                uppercase tracking-wide">
+                  <p className="text-blue-200 text-xs font-bold uppercase tracking-wide">
                     Today's Focus
                   </p>
                   <h2 className="text-2xl font-extrabold mt-0.5">
                     Day {todaysPlan.day}: {todaysPlan.theme}
                   </h2>
                 </div>
-                <span className={`px-3 py-1 rounded-full text-xs
-                  font-bold uppercase
+                <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase
                   ${todaysPlan.focus === 'weak'     ? 'bg-red-500'
                     : todaysPlan.focus === 'exam-sim' ? 'bg-purple-500'
                     : todaysPlan.focus === 'review'   ? 'bg-amber-500'
@@ -614,29 +667,28 @@ export default function StudyModules() {
               {todaysPlan.tip && (
                 <div className="bg-blue-700/30 rounded-xl p-3">
                   <p className="text-xs text-blue-200">
-                    💡 <span className="font-bold">Tip:</span>{' '}
-                    {todaysPlan.tip}
+                    💡 <span className="font-bold">Tip:</span> {todaysPlan.tip}
                   </p>
                 </div>
               )}
 
               <div className="flex gap-2 pt-1">
                 <Link to="/mock-exam"
-                      className="flex-1 text-center py-2 bg-white
-                                 text-blue-600 rounded-xl text-sm
-                                 font-bold hover:bg-blue-50 transition-colors">
+                      className="flex-1 text-center py-2 bg-white text-blue-600
+                                 rounded-xl text-sm font-bold hover:bg-blue-50
+                                 transition-colors">
                   📝 Practice
                 </Link>
                 <Link to="/chat"
-                      className="flex-1 text-center py-2 bg-blue-500
-                                 text-white rounded-xl text-sm font-bold
-                                 hover:bg-blue-400 transition-colors">
+                      className="flex-1 text-center py-2 bg-blue-500 text-white
+                                 rounded-xl text-sm font-bold hover:bg-blue-400
+                                 transition-colors">
                   🤖 AI Coach
                 </Link>
                 <Link to="/blog"
-                      className="flex-1 text-center py-2 bg-blue-500
-                                 text-white rounded-xl text-sm font-bold
-                                 hover:bg-blue-400 transition-colors">
+                      className="flex-1 text-center py-2 bg-blue-500 text-white
+                                 rounded-xl text-sm font-bold hover:bg-blue-400
+                                 transition-colors">
                   📰 Blog
                 </Link>
               </div>
@@ -644,61 +696,45 @@ export default function StudyModules() {
           )}
 
           {/* Plan overview */}
-          {studyPlan && (
+          {studyPlan && canUse('studyPlan') && (
             <div className="space-y-4">
-              <div className="bg-slate-50 border border-slate-200
-                              rounded-2xl p-5 space-y-3">
+              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 space-y-3">
                 <h2 className="text-base font-bold text-slate-900">
                   📋 Your Personalized Study Plan
                 </h2>
-                <p className="text-sm text-slate-600">
-                  {studyPlan.overview}
-                </p>
+                <p className="text-sm text-slate-600">{studyPlan.overview}</p>
                 <div className="grid grid-cols-3 gap-3">
                   {[
-                    { value: studyPlan.days?.length, label: 'Days Planned',  color: 'text-blue-600'   },
-                    { value: studyPlan.daily_hours + 'h', label: 'Daily Hours', color: 'text-purple-600' },
-                    { value: daysLeft,              label: 'Days Left',    color: 'text-green-600'  },
+                    { value: studyPlan.days?.length,       label: 'Days Planned',  color: 'text-blue-600'   },
+                    { value: studyPlan.daily_hours + 'h',  label: 'Daily Hours',   color: 'text-purple-600' },
+                    { value: daysLeft,                     label: 'Days Left',     color: 'text-green-600'  },
                   ].map(({ value, label, color }) => (
                     <div key={label}
-                         className="bg-white p-3 rounded-xl border
-                                    border-slate-200 text-center">
-                      <div className={`text-2xl font-black ${color}`}>
-                        {value}
-                      </div>
-                      <div className="text-xs text-slate-500 uppercase
-                                      font-semibold">
-                        {label}
-                      </div>
+                         className="bg-white p-3 rounded-xl border border-slate-200 text-center">
+                      <div className={`text-2xl font-black ${color}`}>{value}</div>
+                      <div className="text-xs text-slate-500 uppercase font-semibold">{label}</div>
                     </div>
                   ))}
                 </div>
-                <div className="bg-blue-50 border border-blue-100
-                                rounded-xl p-3">
-                  <p className="text-xs font-bold text-blue-800 uppercase mb-1">
-                    Strategy
-                  </p>
-                  <p className="text-sm text-blue-700">
-                    {studyPlan.focus_strategy}
-                  </p>
+                <div className="bg-blue-50 border border-blue-100 rounded-xl p-3">
+                  <p className="text-xs font-bold text-blue-800 uppercase mb-1">Strategy</p>
+                  <p className="text-sm text-blue-700">{studyPlan.focus_strategy}</p>
                 </div>
               </div>
 
               {/* Weekly milestones */}
               {studyPlan.weekly_milestones?.length > 0 && (
-                <div className="bg-white border border-slate-200
-                                rounded-2xl p-5 space-y-3">
-                  <h3 className="text-sm font-bold text-slate-800
-                                 uppercase tracking-wide">
+                <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-3">
+                  <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wide">
                     🏁 Weekly Milestones
                   </h3>
                   {studyPlan.weekly_milestones.map((m, i) => (
                     <div key={i}
-                         className="flex items-start gap-3 p-3
-                                    bg-slate-50 rounded-xl border border-slate-100">
-                      <span className="w-6 h-6 bg-blue-600 text-white
-                                       rounded-full flex items-center
-                                       justify-center text-xs font-bold shrink-0">
+                         className="flex items-start gap-3 p-3 bg-slate-50
+                                    rounded-xl border border-slate-100">
+                      <span className="w-6 h-6 bg-blue-600 text-white rounded-full
+                                       flex items-center justify-center text-xs
+                                       font-bold shrink-0">
                         {i + 1}
                       </span>
                       <p className="text-sm text-slate-700">{m}</p>
@@ -709,8 +745,7 @@ export default function StudyModules() {
 
               {/* Day-by-day */}
               <div className="space-y-3">
-                <h3 className="text-sm font-bold text-slate-800
-                               uppercase tracking-wide">
+                <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wide">
                   📆 Day-by-Day Schedule
                 </h3>
                 {studyPlan.days?.map(day => {
@@ -729,13 +764,13 @@ export default function StudyModules() {
                     >
                       <button
                         onClick={() => setExpandedDay(isExpanded ? null : day.day)}
-                        className="w-full flex items-center justify-between
-                                   p-4 text-left hover:bg-white/50 transition-colors"
+                        className="w-full flex items-center justify-between p-4
+                                   text-left hover:bg-white/50 transition-colors"
                       >
                         <div className="flex items-center gap-3">
                           <div className={`
-                            w-10 h-10 rounded-xl flex items-center
-                            justify-center text-sm font-black shrink-0
+                            w-10 h-10 rounded-xl flex items-center justify-center
+                            text-sm font-black shrink-0
                             ${isActualToday
                               ? 'bg-blue-600 text-white'
                               : 'bg-white border border-slate-200 text-slate-700'
@@ -749,18 +784,15 @@ export default function StudyModules() {
                                 {day.theme}
                               </p>
                               {isActualToday && (
-                                <span className="text-[10px] bg-blue-600
-                                                 text-white px-2 py-0.5
-                                                 rounded-full font-bold">
+                                <span className="text-[10px] bg-blue-600 text-white
+                                                 px-2 py-0.5 rounded-full font-bold">
                                   TODAY
                                 </span>
                               )}
                             </div>
                             <p className="text-xs text-slate-500 mt-0.5">
                               {day.date} •{' '}
-                              <span className="capitalize font-medium">
-                                {day.focus}
-                              </span>
+                              <span className="capitalize font-medium">{day.focus}</span>
                             </p>
                           </div>
                         </div>
@@ -771,38 +803,28 @@ export default function StudyModules() {
                       </button>
 
                       {isExpanded && (
-                        <div className="px-4 pb-4 space-y-3 border-t
-                                        border-slate-100 pt-3">
+                        <div className="px-4 pb-4 space-y-3 border-t border-slate-100 pt-3">
                           <div className="space-y-1.5">
-                            <p className="text-[10px] font-bold text-slate-400
-                                          uppercase tracking-wide mb-2">
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-2">
                               Tasks
                             </p>
                             {day.tasks?.map((task, i) => (
-                              <div key={i}
-                                   className="flex items-start gap-2
-                                              text-sm text-slate-700">
-                                <span className="text-blue-500 mt-0.5
-                                                 shrink-0 font-bold">
-                                  {i + 1}.
-                                </span>
+                              <div key={i} className="flex items-start gap-2 text-sm text-slate-700">
+                                <span className="text-blue-500 mt-0.5 shrink-0 font-bold">{i + 1}.</span>
                                 {task}
                               </div>
                             ))}
                           </div>
 
-                          <div className="bg-white border border-slate-200
-                                          rounded-xl p-3">
-                            <p className="text-[10px] font-bold text-slate-400
-                                          uppercase tracking-wide mb-1">
+                          <div className="bg-white border border-slate-200 rounded-xl p-3">
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-1">
                               🎯 Goal
                             </p>
                             <p className="text-sm text-slate-700">{day.goal}</p>
                           </div>
 
                           {day.tip && (
-                            <div className="bg-amber-50 border border-amber-100
-                                            rounded-xl p-3">
+                            <div className="bg-amber-50 border border-amber-100 rounded-xl p-3">
                               <p className="text-xs text-amber-700">
                                 💡 <span className="font-bold">Tip:</span> {day.tip}
                               </p>
@@ -811,16 +833,14 @@ export default function StudyModules() {
 
                           <div className="flex gap-2">
                             <Link to="/mock-exam"
-                                  className="flex-1 text-center py-2
-                                             bg-blue-600 text-white rounded-xl
-                                             text-xs font-bold hover:bg-blue-700
+                                  className="flex-1 text-center py-2 bg-blue-600 text-white
+                                             rounded-xl text-xs font-bold hover:bg-blue-700
                                              transition-colors">
                               Practice
                             </Link>
                             <Link to="/chat"
-                                  className="flex-1 text-center py-2
-                                             bg-slate-100 text-slate-700 rounded-xl
-                                             text-xs font-bold hover:bg-slate-200
+                                  className="flex-1 text-center py-2 bg-slate-100 text-slate-700
+                                             rounded-xl text-xs font-bold hover:bg-slate-200
                                              transition-colors">
                               AI Coach
                             </Link>
@@ -835,9 +855,8 @@ export default function StudyModules() {
               <button
                 onClick={() => generateStudyPlan(false)}
                 disabled={planLoading}
-                className="w-full py-2.5 text-sm font-medium border
-                           border-slate-200 text-slate-600 rounded-xl
-                           hover:bg-slate-50 transition-colors
+                className="w-full py-2.5 text-sm font-medium border border-slate-200
+                           text-slate-600 rounded-xl hover:bg-slate-50 transition-colors
                            disabled:opacity-60"
               >
                 {planLoading ? 'Regenerating…' : '🔄 Regenerate Plan'}
@@ -853,439 +872,418 @@ export default function StudyModules() {
       {activeTab === 'assignment' && (
         <div className="space-y-6">
 
-          {/* Submit form */}
-          <div className="bg-white border border-slate-200 rounded-2xl
-                          p-6 space-y-5">
-            <div>
-              <h2 className="text-lg font-bold text-slate-900">
-                📝 Submit Assignment for AI Analysis
-              </h2>
-              <p className="text-sm text-slate-500 mt-1">
-                Submit your essay, memo, brief, or practice answer.
-                AI will grade it and give detailed feedback.
-              </p>
-            </div>
+          {/* ── Gate assignments behind Pro ── */}
+          {!canUse('assignments') ? (
+            <LockedFeature
+              feature="assignments"
+              title="Assignment Analysis is a Pro Feature"
+              desc="Upgrade to Pro to submit essays, memos, and practice answers for instant AI grading and detailed feedback."
+            />
+          ) : (
+            <>
+              {/* Submit form */}
+              <div className="bg-white border border-slate-200 rounded-2xl p-6 space-y-5">
+                <div>
+                  <h2 className="text-lg font-bold text-slate-900">
+                    📝 Submit Assignment for AI Analysis
+                  </h2>
+                  <p className="text-sm text-slate-500 mt-1">
+                    Submit your essay, memo, brief, or practice answer.
+                    AI will grade it and give detailed feedback.
+                  </p>
+                </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-400
-                                   uppercase tracking-wide mb-2">
-                  Topic
-                </label>
-                <select
-                  value={assignmentTopic}
-                  onChange={e => setAssignmentTopic(e.target.value)}
-                  className="w-full border border-slate-200 rounded-xl
-                             px-4 py-2.5 text-sm focus:outline-none
-                             focus:border-blue-500 transition-colors bg-white"
-                >
-                  {TOPICS.map(t => (
-                    <option key={t} value={t}>{t}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-400
-                                   uppercase tracking-wide mb-2">
-                  Type
-                </label>
-                <select
-                  value={assignmentType}
-                  onChange={e => setAssignmentType(e.target.value)}
-                  className="w-full border border-slate-200 rounded-xl
-                             px-4 py-2.5 text-sm focus:outline-none
-                             focus:border-blue-500 transition-colors bg-white"
-                >
-                  {ASSIGNMENT_TYPES.map(t => (
-                    <option key={t.value} value={t.value}>{t.label}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-400
-                                 uppercase tracking-wide mb-2">
-                Your Assignment Text
-              </label>
-              <textarea
-                value={assignmentText}
-                onChange={e => setAssignmentText(e.target.value)}
-                placeholder="Paste or type your assignment here..."
-                rows={10}
-                className="w-full border border-slate-200 rounded-xl
-                           px-4 py-2.5 text-sm resize-none font-mono
-                           focus:outline-none focus:border-blue-500
-                           transition-colors"
-              />
-              <div className="flex justify-between mt-1">
-                <span className="text-[10px] text-slate-400">
-                  Be as detailed as possible
-                </span>
-                <span className={`text-[10px] ${
-                  assignmentText.length > 3000
-                    ? 'text-amber-600'
-                    : 'text-slate-400'
-                }`}>
-                  {assignmentText.length} / 3000
-                  {assignmentText.length > 3000 && ' (truncated)'}
-                </span>
-              </div>
-            </div>
-
-            {/* File upload */}
-            <div>
-              <label className="block text-xs font-bold text-slate-400
-                                 uppercase tracking-wide mb-2">
-                Or Upload a File
-              </label>
-              <div
-                onClick={() => fileInputRef.current?.click()}
-                className={`border-2 border-dashed rounded-xl p-6
-                            text-center cursor-pointer transition-colors
-                            ${assignmentFile
-                              ? 'border-blue-300 bg-blue-50'
-                              : 'border-slate-300 hover:border-blue-300 hover:bg-slate-50'
-                            }`}
-              >
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".txt,.pdf,.doc,.docx"
-                  className="hidden"
-                  onChange={e => setAssignmentFile(e.target.files?.[0] || null)}
-                />
-                {assignmentFile ? (
-                  <div className="space-y-1">
-                    <p className="text-sm font-bold text-blue-700">
-                      📎 {assignmentFile.name}
-                    </p>
-                    <p className="text-xs text-slate-500">
-                      {(assignmentFile.size / 1024).toFixed(1)} KB
-                    </p>
-                    <button
-                      onClick={e => { e.stopPropagation(); setAssignmentFile(null) }}
-                      className="text-xs text-red-500 hover:text-red-700 underline"
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-400
+                                       uppercase tracking-wide mb-2">
+                      Topic
+                    </label>
+                    <select
+                      value={assignmentTopic}
+                      onChange={e => setAssignmentTopic(e.target.value)}
+                      className="w-full border border-slate-200 rounded-xl px-4 py-2.5
+                                 text-sm focus:outline-none focus:border-blue-500
+                                 transition-colors bg-white"
                     >
-                      Remove
-                    </button>
+                      {TOPICS.map(t => (
+                        <option key={t} value={t}>{t}</option>
+                      ))}
+                    </select>
                   </div>
-                ) : (
-                  <div className="space-y-1">
-                    <p className="text-2xl">📁</p>
-                    <p className="text-sm text-slate-600 font-medium">
-                      Click to upload
-                    </p>
-                    <p className="text-xs text-slate-400">TXT, PDF, DOC — up to 5MB</p>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-400
+                                       uppercase tracking-wide mb-2">
+                      Type
+                    </label>
+                    <select
+                      value={assignmentType}
+                      onChange={e => setAssignmentType(e.target.value)}
+                      className="w-full border border-slate-200 rounded-xl px-4 py-2.5
+                                 text-sm focus:outline-none focus:border-blue-500
+                                 transition-colors bg-white"
+                    >
+                      {ASSIGNMENT_TYPES.map(t => (
+                        <option key={t.value} value={t.value}>{t.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-400
+                                     uppercase tracking-wide mb-2">
+                    Your Assignment Text
+                  </label>
+                  <textarea
+                    value={assignmentText}
+                    onChange={e => setAssignmentText(e.target.value)}
+                    placeholder="Paste or type your assignment here..."
+                    rows={10}
+                    className="w-full border border-slate-200 rounded-xl px-4 py-2.5
+                               text-sm resize-none font-mono focus:outline-none
+                               focus:border-blue-500 transition-colors"
+                  />
+                  <div className="flex justify-between mt-1">
+                    <span className="text-[10px] text-slate-400">Be as detailed as possible</span>
+                    <span className={`text-[10px] ${
+                      assignmentText.length > 3000 ? 'text-amber-600' : 'text-slate-400'
+                    }`}>
+                      {assignmentText.length} / 3000
+                      {assignmentText.length > 3000 && ' (truncated)'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* File upload */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-400
+                                     uppercase tracking-wide mb-2">
+                    Or Upload a File
+                  </label>
+                  <div
+                    onClick={() => fileInputRef.current?.click()}
+                    className={`border-2 border-dashed rounded-xl p-6 text-center
+                                cursor-pointer transition-colors
+                                ${assignmentFile
+                                  ? 'border-blue-300 bg-blue-50'
+                                  : 'border-slate-300 hover:border-blue-300 hover:bg-slate-50'
+                                }`}
+                  >
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept=".txt,.pdf,.doc,.docx"
+                      className="hidden"
+                      onChange={e => setAssignmentFile(e.target.files?.[0] || null)}
+                    />
+                    {assignmentFile ? (
+                      <div className="space-y-1">
+                        <p className="text-sm font-bold text-blue-700">
+                          📎 {assignmentFile.name}
+                        </p>
+                        <p className="text-xs text-slate-500">
+                          {(assignmentFile.size / 1024).toFixed(1)} KB
+                        </p>
+                        <button
+                          onClick={e => { e.stopPropagation(); setAssignmentFile(null) }}
+                          className="text-xs text-red-500 hover:text-red-700 underline"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="space-y-1">
+                        <p className="text-2xl">📁</p>
+                        <p className="text-sm text-slate-600 font-medium">Click to upload</p>
+                        <p className="text-xs text-slate-400">TXT, PDF, DOC — up to 5MB</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {analysisError && (
+                  <div className="p-3 bg-red-50 border border-red-200 rounded-xl
+                                  text-red-700 text-sm flex gap-2">
+                    <span>❌</span>
+                    <span>{analysisError}</span>
                   </div>
                 )}
+
+                <button
+                  onClick={submitAssignment}
+                  disabled={analysisLoading || (!assignmentText.trim() && !assignmentFile)}
+                  className="w-full py-3 bg-blue-600 text-white font-bold rounded-xl
+                             hover:bg-blue-700 transition-colors disabled:opacity-60
+                             flex items-center justify-center gap-2 min-h-[48px]"
+                >
+                  {analysisLoading
+                    ? <><LoadingSpinner size="sm" color="white" /> Analyzing…</>
+                    : '🤖 Submit for AI Analysis'
+                  }
+                </button>
               </div>
-            </div>
 
-            {analysisError && (
-              <div className="p-3 bg-red-50 border border-red-200
-                              rounded-xl text-red-700 text-sm flex gap-2">
-                <span>❌</span>
-                <span>{analysisError}</span>
-              </div>
-            )}
-
-            <button
-              onClick={submitAssignment}
-              disabled={analysisLoading || (!assignmentText.trim() && !assignmentFile)}
-              className="w-full py-3 bg-blue-600 text-white font-bold
-                         rounded-xl hover:bg-blue-700 transition-colors
-                         disabled:opacity-60 flex items-center
-                         justify-center gap-2 min-h-[48px]"
-            >
-              {analysisLoading
-                ? <><LoadingSpinner size="sm" color="white" /> Analyzing…</>
-                : '🤖 Submit for AI Analysis'
-              }
-            </button>
-          </div>
-
-          {/* Analysis result */}
-          {analysisResult && (
-            <div className="space-y-4">
-              {/* Grade banner */}
-              <div className={`p-6 rounded-2xl border-2
-                ${GRADE_BG[analysisResult.overall_grade] || 'bg-slate-50 border-slate-200'}`}>
-                <div className="flex flex-col sm:flex-row sm:items-center
-                                sm:justify-between gap-4">
-                  <div>
-                    <p className="text-xs font-bold text-slate-500
-                                  uppercase tracking-wide">
-                      AI Grade — {assignmentType} on {assignmentTopic}
-                    </p>
-                    <div className="flex items-center gap-3 mt-2">
-                      <span className={`text-6xl font-black
-                        ${GRADE_COLORS[analysisResult.overall_grade] || 'text-slate-600'}`}>
-                        {analysisResult.overall_grade}
-                      </span>
+              {/* Analysis result */}
+              {analysisResult && (
+                <div className="space-y-4">
+                  {/* Grade banner */}
+                  <div className={`p-6 rounded-2xl border-2
+                    ${GRADE_BG[analysisResult.overall_grade] || 'bg-slate-50 border-slate-200'}`}>
+                    <div className="flex flex-col sm:flex-row sm:items-center
+                                    sm:justify-between gap-4">
                       <div>
-                        <div className="text-2xl font-extrabold text-slate-900">
-                          {analysisResult.score}/100
-                        </div>
-                        <span className={`text-xs font-bold px-2.5 py-1
-                          rounded-full
-                          ${(READINESS[analysisResult.bar_exam_readiness] || READINESS['developing']).color}`}>
-                          {(READINESS[analysisResult.bar_exam_readiness] || READINESS['developing']).label}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2 min-w-[200px]">
-                    {[
-                      { label: 'Rule Accuracy',    score: analysisResult.rule_accuracy?.score    },
-                      { label: 'Analysis Quality', score: analysisResult.analysis_quality?.score },
-                      { label: 'Issue Spotting',   score: analysisResult.issue_spotting?.score   },
-                      { label: 'Writing Quality',  score: analysisResult.writing_quality?.score  },
-                    ].map(({ label, score }) => (
-                      <div key={label}>
-                        <div className="flex justify-between text-xs text-slate-600 mb-0.5">
-                          <span>{label}</span>
-                          <span className="font-bold">{score}%</span>
-                        </div>
-                        <ScoreBar score={score} />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <p className="text-sm text-slate-700 mt-4 leading-relaxed
-                              border-t border-slate-200/50 pt-4">
-                  {analysisResult.summary}
-                </p>
-              </div>
-
-              {/* Strengths & Weaknesses */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="bg-green-50 border border-green-200
-                                rounded-2xl p-5 space-y-3">
-                  <h3 className="text-sm font-bold text-green-800 uppercase">
-                    ✅ Strengths
-                  </h3>
-                  <ul className="space-y-2">
-                    {analysisResult.strengths?.map((s, i) => (
-                      <li key={i} className="flex items-start gap-2
-                                             text-sm text-green-900">
-                        <span className="text-green-500 shrink-0 font-bold">✓</span>
-                        {s}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-                <div className="bg-red-50 border border-red-200
-                                rounded-2xl p-5 space-y-3">
-                  <h3 className="text-sm font-bold text-red-800 uppercase">
-                    ⚠️ Weaknesses
-                  </h3>
-                  <ul className="space-y-2">
-                    {analysisResult.weaknesses?.map((w, i) => (
-                      <li key={i} className="flex items-start gap-2
-                                             text-sm text-red-900">
-                        <span className="text-red-500 shrink-0">•</span>
-                        {w}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-
-              {/* Detailed feedback */}
-              <div className="bg-white border border-slate-200 rounded-2xl
-                              p-5 space-y-4">
-                <h3 className="text-sm font-bold text-slate-800 uppercase">
-                  🔍 Detailed Feedback
-                </h3>
-                {[
-                  { label: 'Rule Accuracy',    data: analysisResult.rule_accuracy    },
-                  { label: 'Analysis Quality', data: analysisResult.analysis_quality },
-                  { label: 'Issue Spotting',   data: analysisResult.issue_spotting   },
-                  { label: 'Writing Quality',  data: analysisResult.writing_quality  },
-                ].filter(({ data }) => data).map(({ label, data }) => (
-                  <div key={label}
-                       className="p-4 bg-slate-50 rounded-xl space-y-2">
-                    <div className="flex justify-between items-center">
-                      <p className="text-xs font-bold text-slate-700 uppercase">
-                        {label}
-                      </p>
-                      <span className={`text-sm font-extrabold
-                        ${data.score >= 80 ? 'text-green-600'
-                          : data.score >= 60 ? 'text-blue-600'
-                          : 'text-amber-600'
-                        }`}>
-                        {data.score}%
-                      </span>
-                    </div>
-                    <ScoreBar score={data.score} />
-                    <p className="text-xs text-slate-600">{data.feedback}</p>
-                  </div>
-                ))}
-              </div>
-
-              {/* Improvements */}
-              <div className="bg-blue-50 border border-blue-200 rounded-2xl p-5">
-                <h3 className="text-sm font-bold text-blue-900 uppercase mb-3">
-                  🚀 How to Improve
-                </h3>
-                <ol className="space-y-2">
-                  {analysisResult.improvements?.map((imp, i) => (
-                    <li key={i} className="flex items-start gap-3
-                                           text-sm text-blue-900">
-                      <span className="w-5 h-5 bg-blue-600 text-white
-                                       rounded-full flex items-center
-                                       justify-center text-xs font-bold shrink-0">
-                        {i + 1}
-                      </span>
-                      {imp}
-                    </li>
-                  ))}
-                </ol>
-              </div>
-
-              {/* Model answer */}
-              {analysisResult.model_answer_hints && (
-                <div className="bg-amber-50 border border-amber-200
-                                rounded-2xl p-5">
-                  <h3 className="text-sm font-bold text-amber-900 uppercase mb-2">
-                    📖 Perfect Answer Guide
-                  </h3>
-                  <p className="text-sm text-amber-800">
-                    {analysisResult.model_answer_hints}
-                  </p>
-                </div>
-              )}
-
-              {/* Recommended study */}
-              {analysisResult.recommended_study?.length > 0 && (
-                <div className="bg-white border border-slate-200 rounded-2xl p-5">
-                  <h3 className="text-sm font-bold text-slate-800 uppercase mb-3">
-                    📚 Recommended Study Areas
-                  </h3>
-                  <div className="flex flex-wrap gap-2 mb-3">
-                    {analysisResult.recommended_study.map((topic, i) => (
-                      <Link key={i} to="/chat"
-                            className="text-xs bg-slate-100 border border-slate-200
-                                       text-slate-700 px-3 py-1.5 rounded-full
-                                       hover:bg-blue-50 hover:border-blue-300
-                                       hover:text-blue-700 transition-colors font-medium">
-                        📖 {topic}
-                      </Link>
-                    ))}
-                  </div>
-                  <div className="flex gap-2">
-                    <Link to="/mock-exam"
-                          className="flex-1 text-center py-2.5 bg-blue-600
-                                     text-white rounded-xl text-sm font-bold
-                                     hover:bg-blue-700 transition-colors">
-                      📝 Practice
-                    </Link>
-                    <Link to="/blog"
-                          className="flex-1 text-center py-2.5 bg-slate-100
-                                     text-slate-700 rounded-xl text-sm font-bold
-                                     hover:bg-slate-200 transition-colors">
-                      📰 Blog Tips
-                    </Link>
-                    <Link to="/tutorials"
-                          className="flex-1 text-center py-2.5 bg-slate-100
-                                     text-slate-700 rounded-xl text-sm font-bold
-                                     hover:bg-slate-200 transition-colors">
-                      🎥 Tutorials
-                    </Link>
-                  </div>
-                </div>
-              )}
-
-              <button
-                onClick={resetAssignment}
-                className="w-full py-2.5 text-sm font-medium border
-                           border-slate-200 text-slate-600 rounded-xl
-                           hover:bg-slate-50 transition-colors"
-              >
-                ✍️ Submit Another Assignment
-              </button>
-            </div>
-          )}
-
-          {/* Past assignments */}
-          {!analysisResult && (
-            <div className="space-y-4">
-              <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wide">
-                📋 Past Submissions
-              </h3>
-
-              {loadingPast ? (
-                <div className="space-y-3">
-                  {[1, 2, 3].map(i => <AssignmentSkeleton key={i} />)}
-                </div>
-              ) : pastAssignments.length === 0 ? (
-                <div className="bg-white border border-slate-200 rounded-xl
-                                text-center py-8">
-                  <p className="text-slate-500 text-sm">
-                    No submissions yet. Submit an assignment above.
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {pastAssignments.map((a, i) => {
-                    let parsed = null
-                    try { parsed = JSON.parse(a.feedback) } catch {}
-                    return (
-                      <details
-                        key={a.id || i}
-                        className="bg-white border border-slate-200
-                                   rounded-xl overflow-hidden
-                                   hover:border-slate-300 transition-all"
-                      >
-                        <summary className="flex items-center justify-between
-                                            p-4 cursor-pointer select-none list-none">
-                          <div className="flex items-center gap-3">
-                            <span className={`text-2xl font-black
-                              ${GRADE_COLORS[a.grade] || 'text-slate-600'}`}>
-                              {a.grade || '?'}
-                            </span>
-                            <div>
-                              <p className="text-sm font-semibold text-slate-900">
-                                {a.topic} — {a.type}
-                              </p>
-                              <p className="text-xs text-slate-400 mt-0.5">
-                                {a.score}/100 •{' '}
-                                {a.created_at
-                                  ? new Date(a.created_at).toLocaleDateString()
-                                  : 'Just now'
-                                }
-                                {a.file_name && ` • 📎 ${a.file_name}`}
-                              </p>
+                        <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">
+                          AI Grade — {assignmentType} on {assignmentTopic}
+                        </p>
+                        <div className="flex items-center gap-3 mt-2">
+                          <span className={`text-6xl font-black
+                            ${GRADE_COLORS[analysisResult.overall_grade] || 'text-slate-600'}`}>
+                            {analysisResult.overall_grade}
+                          </span>
+                          <div>
+                            <div className="text-2xl font-extrabold text-slate-900">
+                              {analysisResult.score}/100
                             </div>
+                            <span className={`text-xs font-bold px-2.5 py-1 rounded-full
+                              ${(READINESS[analysisResult.bar_exam_readiness] || READINESS['developing']).color}`}>
+                              {(READINESS[analysisResult.bar_exam_readiness] || READINESS['developing']).label}
+                            </span>
                           </div>
-                          <span className="text-slate-400 text-xs">▼</span>
-                        </summary>
+                        </div>
+                      </div>
 
-                        {parsed && (
-                          <div className="p-4 border-t border-slate-100
-                                          bg-slate-50 space-y-3">
-                            <p className="text-sm text-slate-700">{parsed.summary}</p>
-                            {parsed.improvements?.slice(0, 2).map((imp, j) => (
-                              <p key={j}
-                                 className="text-xs text-slate-600 flex gap-1.5">
-                                <span className="text-blue-500">→</span>
-                                {imp}
-                              </p>
-                            ))}
+                      <div className="space-y-2 min-w-[200px]">
+                        {[
+                          { label: 'Rule Accuracy',    score: analysisResult.rule_accuracy?.score    },
+                          { label: 'Analysis Quality', score: analysisResult.analysis_quality?.score },
+                          { label: 'Issue Spotting',   score: analysisResult.issue_spotting?.score   },
+                          { label: 'Writing Quality',  score: analysisResult.writing_quality?.score  },
+                        ].map(({ label, score }) => (
+                          <div key={label}>
+                            <div className="flex justify-between text-xs text-slate-600 mb-0.5">
+                              <span>{label}</span>
+                              <span className="font-bold">{score}%</span>
+                            </div>
+                            <ScoreBar score={score} />
                           </div>
-                        )}
-                      </details>
-                    )
-                  })}
+                        ))}
+                      </div>
+                    </div>
+
+                    <p className="text-sm text-slate-700 mt-4 leading-relaxed
+                                  border-t border-slate-200/50 pt-4">
+                      {analysisResult.summary}
+                    </p>
+                  </div>
+
+                  {/* Strengths & Weaknesses */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="bg-green-50 border border-green-200 rounded-2xl p-5 space-y-3">
+                      <h3 className="text-sm font-bold text-green-800 uppercase">✅ Strengths</h3>
+                      <ul className="space-y-2">
+                        {analysisResult.strengths?.map((s, i) => (
+                          <li key={i} className="flex items-start gap-2 text-sm text-green-900">
+                            <span className="text-green-500 shrink-0 font-bold">✓</span>
+                            {s}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                    <div className="bg-red-50 border border-red-200 rounded-2xl p-5 space-y-3">
+                      <h3 className="text-sm font-bold text-red-800 uppercase">⚠️ Weaknesses</h3>
+                      <ul className="space-y-2">
+                        {analysisResult.weaknesses?.map((w, i) => (
+                          <li key={i} className="flex items-start gap-2 text-sm text-red-900">
+                            <span className="text-red-500 shrink-0">•</span>
+                            {w}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+
+                  {/* Detailed feedback */}
+                  <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-4">
+                    <h3 className="text-sm font-bold text-slate-800 uppercase">🔍 Detailed Feedback</h3>
+                    {[
+                      { label: 'Rule Accuracy',    data: analysisResult.rule_accuracy    },
+                      { label: 'Analysis Quality', data: analysisResult.analysis_quality },
+                      { label: 'Issue Spotting',   data: analysisResult.issue_spotting   },
+                      { label: 'Writing Quality',  data: analysisResult.writing_quality  },
+                    ].filter(({ data }) => data).map(({ label, data }) => (
+                      <div key={label} className="p-4 bg-slate-50 rounded-xl space-y-2">
+                        <div className="flex justify-between items-center">
+                          <p className="text-xs font-bold text-slate-700 uppercase">{label}</p>
+                          <span className={`text-sm font-extrabold
+                            ${data.score >= 80 ? 'text-green-600'
+                              : data.score >= 60 ? 'text-blue-600'
+                              : 'text-amber-600'
+                            }`}>
+                            {data.score}%
+                          </span>
+                        </div>
+                        <ScoreBar score={data.score} />
+                        <p className="text-xs text-slate-600">{data.feedback}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Improvements */}
+                  <div className="bg-blue-50 border border-blue-200 rounded-2xl p-5">
+                    <h3 className="text-sm font-bold text-blue-900 uppercase mb-3">
+                      🚀 How to Improve
+                    </h3>
+                    <ol className="space-y-2">
+                      {analysisResult.improvements?.map((imp, i) => (
+                        <li key={i} className="flex items-start gap-3 text-sm text-blue-900">
+                          <span className="w-5 h-5 bg-blue-600 text-white rounded-full
+                                           flex items-center justify-center text-xs
+                                           font-bold shrink-0">
+                            {i + 1}
+                          </span>
+                          {imp}
+                        </li>
+                      ))}
+                    </ol>
+                  </div>
+
+                  {/* Model answer */}
+                  {analysisResult.model_answer_hints && (
+                    <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5">
+                      <h3 className="text-sm font-bold text-amber-900 uppercase mb-2">
+                        📖 Perfect Answer Guide
+                      </h3>
+                      <p className="text-sm text-amber-800">{analysisResult.model_answer_hints}</p>
+                    </div>
+                  )}
+
+                  {/* Recommended study */}
+                  {analysisResult.recommended_study?.length > 0 && (
+                    <div className="bg-white border border-slate-200 rounded-2xl p-5">
+                      <h3 className="text-sm font-bold text-slate-800 uppercase mb-3">
+                        📚 Recommended Study Areas
+                      </h3>
+                      <div className="flex flex-wrap gap-2 mb-3">
+                        {analysisResult.recommended_study.map((topic, i) => (
+                          <Link key={i} to="/chat"
+                                className="text-xs bg-slate-100 border border-slate-200
+                                           text-slate-700 px-3 py-1.5 rounded-full
+                                           hover:bg-blue-50 hover:border-blue-300
+                                           hover:text-blue-700 transition-colors font-medium">
+                            📖 {topic}
+                          </Link>
+                        ))}
+                      </div>
+                      <div className="flex gap-2">
+                        <Link to="/mock-exam"
+                              className="flex-1 text-center py-2.5 bg-blue-600 text-white
+                                         rounded-xl text-sm font-bold hover:bg-blue-700
+                                         transition-colors">
+                          📝 Practice
+                        </Link>
+                        <Link to="/blog"
+                              className="flex-1 text-center py-2.5 bg-slate-100 text-slate-700
+                                         rounded-xl text-sm font-bold hover:bg-slate-200
+                                         transition-colors">
+                          📰 Blog Tips
+                        </Link>
+                        <Link to="/tutorials"
+                              className="flex-1 text-center py-2.5 bg-slate-100 text-slate-700
+                                         rounded-xl text-sm font-bold hover:bg-slate-200
+                                         transition-colors">
+                          🎥 Tutorials
+                        </Link>
+                      </div>
+                    </div>
+                  )}
+
+                  <button
+                    onClick={resetAssignment}
+                    className="w-full py-2.5 text-sm font-medium border border-slate-200
+                               text-slate-600 rounded-xl hover:bg-slate-50 transition-colors"
+                  >
+                    ✍️ Submit Another Assignment
+                  </button>
                 </div>
               )}
-            </div>
+
+              {/* Past assignments */}
+              {!analysisResult && (
+                <div className="space-y-4">
+                  <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wide">
+                    📋 Past Submissions
+                  </h3>
+
+                  {loadingPast ? (
+                    <div className="space-y-3">
+                      {[1, 2, 3].map(i => <AssignmentSkeleton key={i} />)}
+                    </div>
+                  ) : pastAssignments.length === 0 ? (
+                    <div className="bg-white border border-slate-200 rounded-xl
+                                    text-center py-8">
+                      <p className="text-slate-500 text-sm">
+                        No submissions yet. Submit an assignment above.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {pastAssignments.map((a, i) => {
+                        let parsed = null
+                        try { parsed = JSON.parse(a.feedback) } catch {}
+                        return (
+                          <details
+                            key={a.id || i}
+                            className="bg-white border border-slate-200 rounded-xl
+                                       overflow-hidden hover:border-slate-300 transition-all"
+                          >
+                            <summary className="flex items-center justify-between p-4
+                                                cursor-pointer select-none list-none">
+                              <div className="flex items-center gap-3">
+                                <span className={`text-2xl font-black
+                                  ${GRADE_COLORS[a.grade] || 'text-slate-600'}`}>
+                                  {a.grade || '?'}
+                                </span>
+                                <div>
+                                  <p className="text-sm font-semibold text-slate-900">
+                                    {a.topic} — {a.type}
+                                  </p>
+                                  <p className="text-xs text-slate-400 mt-0.5">
+                                    {a.score}/100 •{' '}
+                                    {a.created_at
+                                      ? new Date(a.created_at).toLocaleDateString()
+                                      : 'Just now'
+                                    }
+                                    {a.file_name && ` • 📎 ${a.file_name}`}
+                                  </p>
+                                </div>
+                              </div>
+                              <span className="text-slate-400 text-xs">▼</span>
+                            </summary>
+
+                            {parsed && (
+                              <div className="p-4 border-t border-slate-100 bg-slate-50 space-y-3">
+                                <p className="text-sm text-slate-700">{parsed.summary}</p>
+                                {parsed.improvements?.slice(0, 2).map((imp, j) => (
+                                  <p key={j} className="text-xs text-slate-600 flex gap-1.5">
+                                    <span className="text-blue-500">→</span>
+                                    {imp}
+                                  </p>
+                                ))}
+                              </div>
+                            )}
+                          </details>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
           )}
         </div>
       )}
+
     </div>
   )
 }

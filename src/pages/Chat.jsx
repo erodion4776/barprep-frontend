@@ -4,26 +4,26 @@ import { apiClient }           from '../api/client'
 import LoadingSpinner          from '../components/LoadingSpinner'
 import ReactMarkdown           from 'react-markdown'
 import { useProgress }         from '../context/ProgressContext'
+import { useSubscription }     from '../context/SubscriptionContext'
+import { UpgradeModal }        from '../components/UpgradePrompt'
+import DailyLimitBar           from '../components/DailyLimitBar'
 
-// ── Constants ─────────────────────────────────────────────────────────────────
 const MAX_INPUT_CHARS = 2000
 const MAX_HISTORY     = 10
 const SESSION_LIMIT   = 30
 
 const GREETING = {
-  role:      'assistant',
-  content:   "Hello! I'm your BarPrep AI Coach. I can help you understand legal concepts, answer practice questions, and explain bar exam topics step-by-step. What would you like to study today?",
-  sources:   [],
-  timestamp: new Date().toISOString(),
+  role:       'assistant',
+  content:    "Hello! I'm your BarPrep AI Coach. I can help you understand legal concepts, answer practice questions, and explain bar exam topics step-by-step. What would you like to study today?",
+  sources:    [],
+  timestamp:  new Date().toISOString(),
   isGreeting: true,
 }
 
-// ── Typing indicator ───────────────────────────────────────────────────────────
 function TypingIndicator() {
   return (
     <div className="flex justify-start">
-      <div className="bg-white border border-slate-200 rounded-xl
-                      rounded-bl-sm px-4 py-3 shadow-sm">
+      <div className="bg-slate-100 rounded-xl rounded-bl-sm px-4 py-3 shadow-sm">
         <div className="flex items-center gap-1">
           {[0, 1, 2].map(i => (
             <div
@@ -38,7 +38,6 @@ function TypingIndicator() {
   )
 }
 
-// ── Copy button ────────────────────────────────────────────────────────────────
 function CopyButton({ text }) {
   const [copied, setCopied] = useState(false)
   const handle = async () => {
@@ -51,7 +50,6 @@ function CopyButton({ text }) {
   return (
     <button
       onClick={handle}
-      title="Copy to clipboard"
       className="text-[10px] text-slate-400 hover:text-slate-600
                  transition-colors flex items-center gap-1"
     >
@@ -60,18 +58,6 @@ function CopyButton({ text }) {
   )
 }
 
-// ── Message timestamp ─────────────────────────────────────────────────────────
-function MessageTime({ timestamp }) {
-  if (!timestamp) return null
-  const d = new Date(timestamp)
-  return (
-    <span className="text-[10px] text-slate-300 mt-1 block text-right">
-      {d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-    </span>
-  )
-}
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
 function formatDate(dateStr) {
   const date = new Date(dateStr)
   const diff  = Date.now() - date.getTime()
@@ -90,25 +76,29 @@ function hostFromUrl(url) {
   catch { return url }
 }
 
-// ── Component ─────────────────────────────────────────────────────────────────
 export default function Chat() {
   const { progress, getProgressSummary } = useProgress()
+  const {
+    isFree,
+    checkLimit,
+    incrementUsage,
+  } = useSubscription()
 
-  const [messages,         setMessages]         = useState([GREETING])
-  const [input,            setInput]            = useState('')
-  const [loading,          setLoading]          = useState(false)
-  const [sessions,         setSessions]         = useState([])
-  const [activeSessionId,  setActiveSessionId]  = useState(null)
-  const [sessionsLoading,  setSessionsLoading]  = useState(true)
-  const [sidebarOpen,      setSidebarOpen]      = useState(false)
-  const [progressInjected, setProgressInjected] = useState(false)
-  const [sessionPage,      setSessionPage]      = useState(0)
+  const [messages,        setMessages]        = useState([GREETING])
+  const [input,           setInput]           = useState('')
+  const [loading,         setLoading]         = useState(false)
+  const [sessions,        setSessions]        = useState([])
+  const [activeSessionId, setActiveSessionId] = useState(null)
+  const [sessionsLoading, setSessionsLoading] = useState(true)
+  const [sidebarOpen,     setSidebarOpen]     = useState(false)
+  const [progressInjected,setProgressInjected]= useState(false)
+  const [sessionPage,     setSessionPage]     = useState(0)
+  const [showUpgrade,     setShowUpgrade]     = useState(false)
 
   const bottomRef  = useRef(null)
   const inputRef   = useRef(null)
   const saveTimer  = useRef(null)
 
-  // ── Load sessions on mount ─────────────────────────────────────────────────
   useEffect(() => { loadSessions() }, [])
 
   // ── Personalized greeting ──────────────────────────────────────────────────
@@ -142,29 +132,25 @@ export default function Chat() {
     }
 
     setMessages([{
-      role:      'assistant',
-      content:   msg,
-      sources:   [],
-      timestamp: new Date().toISOString(),
+      role:       'assistant',
+      content:    msg,
+      sources:    [],
+      timestamp:  new Date().toISOString(),
       isGreeting: true,
     }])
     setProgressInjected(true)
   }, [
     progress.loading,
     progress.stats.totalAttempts,
-    progress.stats.overallAccuracy,
-    progress.weakTopics,
-    progress.strongTopics,
-    progress.recommendedTopics,
     progressInjected,
   ])
 
-  // ── Auto-scroll ────────────────────────────────────────────────────────────
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    chatBottomRef?.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, loading])
 
-  // ── Load sessions ──────────────────────────────────────────────────────────
+  const chatBottomRef = useRef(null)
+
   const loadSessions = async () => {
     setSessionsLoading(true)
     try {
@@ -177,7 +163,6 @@ export default function Chat() {
     }
   }
 
-  // ── New chat ───────────────────────────────────────────────────────────────
   const startNewChat = useCallback(() => {
     setMessages([GREETING])
     setActiveSessionId(null)
@@ -187,15 +172,14 @@ export default function Chat() {
     inputRef.current?.focus()
   }, [])
 
-  // ── Load session ───────────────────────────────────────────────────────────
   const loadSession = async (sessionId) => {
     try {
       const res     = await apiClient.getSession(sessionId)
       const session = res.data.session
       if (session?.messages) {
         setMessages(session.messages.map(m => ({
-          sources:   [],
-          timestamp: null,
+          sources:    [],
+          timestamp:  null,
           ...m,
         })))
         setActiveSessionId(session.id)
@@ -207,7 +191,6 @@ export default function Chat() {
     setSidebarOpen(false)
   }
 
-  // ── Save session (debounced) ───────────────────────────────────────────────
   const saveSession = useCallback((updatedMessages, idOverride) => {
     if (saveTimer.current) clearTimeout(saveTimer.current)
     saveTimer.current = setTimeout(async () => {
@@ -228,10 +211,9 @@ export default function Chat() {
       } catch (err) {
         console.error('Failed to save session:', err)
       }
-    }, 1000) // debounce 1s
+    }, 1000)
   }, [activeSessionId])
 
-  // ── Delete session ─────────────────────────────────────────────────────────
   const deleteSession = async (sessionId, e) => {
     e.stopPropagation()
     try {
@@ -249,6 +231,13 @@ export default function Chat() {
     const text = input.trim()
     if (!text || loading) return
 
+    // ── Check free plan daily limit ────────────────────────────────────────
+    const limitCheck = checkLimit('aiMessages')
+    if (!limitCheck.allowed) {
+      setShowUpgrade(true)
+      return
+    }
+
     setInput('')
     setLoading(true)
 
@@ -262,20 +251,21 @@ export default function Chat() {
     setMessages(withUser)
 
     try {
-      // Build history — exclude greeting, keep last N
       const history = withUser
         .filter(m => !m.isGreeting && m.role !== 'system')
         .slice(-MAX_HISTORY)
         .map(({ role, content }) => ({ role, content }))
 
-      // Prepend progress context to user message
-      const progressSummary  = getProgressSummary()
-      const messageWithCtx   =
+      const progressSummary = getProgressSummary()
+      const messageWithCtx  =
         `[STUDENT CONTEXT]\n${progressSummary}\n\n[QUESTION]\n${text}`
 
       const res     = await apiClient.chat(messageWithCtx, history)
       const reply   = res.data.reply   || ''
       const sources = Array.isArray(res.data.sources) ? res.data.sources : []
+
+      // ── Increment usage ──────────────────────────────────────────────────
+      await incrementUsage('aiMessages')
 
       const assistantMsg = {
         role:      'assistant',
@@ -302,7 +292,6 @@ export default function Chat() {
     }
   }
 
-  // ── Handle textarea enter ──────────────────────────────────────────────────
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
@@ -310,7 +299,6 @@ export default function Chat() {
     }
   }
 
-  // ── Quick prompts ──────────────────────────────────────────────────────────
   const quickPrompts = progress.weakTopics.length > 0
     ? [
         `Explain ${progress.weakTopics[0]} for the bar exam`,
@@ -327,17 +315,21 @@ export default function Chat() {
         'How does hearsay work?',
       ]
 
-  // ── Paginated sessions ─────────────────────────────────────────────────────
   const PAGE_SIZE      = 15
   const pagedSessions  = sessions.slice(0, (sessionPage + 1) * PAGE_SIZE)
   const hasMoreSessions = sessions.length > pagedSessions.length
-
-  // ── Show quick prompts only on new chats ───────────────────────────────────
   const isNewChat = messages.length <= 1 || messages.every(m => m.isGreeting)
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] -mx-4 sm:-mx-6 lg:-mx-8
-                    overflow-hidden">
+    <div className="flex h-[calc(100vh-4rem)] -mx-4 sm:-mx-6 lg:-mx-8 overflow-hidden">
+
+      {/* ── Upgrade Modal ── */}
+      {showUpgrade && (
+        <UpgradeModal
+          feature="aiMessages"
+          onClose={() => setShowUpgrade(false)}
+        />
+      )}
 
       {/* ── Sidebar ── */}
       <div className={`
@@ -348,25 +340,22 @@ export default function Chat() {
         lg:translate-x-0
         ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
       `}>
-        {/* New chat button */}
         <div className="p-3 border-b border-slate-700">
           <button
             onClick={startNewChat}
             className="w-full flex items-center gap-3 px-3 py-2.5
                        rounded-lg border border-slate-600
-                       hover:bg-slate-800 transition-colors
-                       text-sm font-medium"
+                       hover:bg-slate-800 transition-colors text-sm font-medium"
           >
             <span className="text-lg">+</span>
             New Chat
           </button>
         </div>
 
-        {/* Progress mini-card */}
+        {/* Progress mini card */}
         {progress.stats.totalAttempts > 0 && (
           <div className="px-3 py-3 border-b border-slate-700 space-y-2">
-            <p className="text-[10px] font-bold text-slate-400
-                          uppercase tracking-wider">
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
               Your Progress
             </p>
             <div className="flex justify-between text-xs text-slate-300">
@@ -388,7 +377,7 @@ export default function Chat() {
                 </p>
               )}
               {progress.weakTopics.length > 0 && (
-                <p className="text-[10px] text-amber-400">
+                <p className="text-[10px] text-amber-400 truncate">
                   ⚠️ {progress.weakTopics[0]}
                 </p>
               )}
@@ -414,8 +403,7 @@ export default function Chat() {
                   onClick={() => loadSession(session.id)}
                   className={`
                     w-full text-left px-3 py-2.5 rounded-lg text-sm
-                    transition-colors group flex items-center
-                    justify-between gap-2
+                    transition-colors group flex items-center justify-between gap-2
                     ${activeSessionId === session.id
                       ? 'bg-slate-700 text-white'
                       : 'text-slate-300 hover:bg-slate-800 hover:text-white'
@@ -432,17 +420,14 @@ export default function Chat() {
                   </div>
                   <button
                     onClick={e => deleteSession(session.id, e)}
-                    className="opacity-0 group-hover:opacity-100
-                               text-slate-500 hover:text-red-400
-                               transition-opacity shrink-0 p-1"
+                    className="opacity-0 group-hover:opacity-100 text-slate-500
+                               hover:text-red-400 transition-opacity shrink-0 p-1"
                     title="Delete"
                   >
                     🗑
                   </button>
                 </button>
               ))}
-
-              {/* Load more sessions */}
               {hasMoreSessions && (
                 <button
                   onClick={() => setSessionPage(p => p + 1)}
@@ -456,17 +441,17 @@ export default function Chat() {
           )}
         </div>
 
-        {/* Sidebar nav links */}
+        {/* Sidebar nav */}
         <div className="p-3 border-t border-slate-700 space-y-1">
-          <p className="text-[10px] font-bold text-slate-400 uppercase
-                        tracking-wider mb-2">
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
             Quick Navigate
           </p>
           {[
-            { to: '/mock-exam', label: '📝 Mock Exam'      },
-            { to: '/tutorials', label: '🎥 Tutorials'      },
-            { to: '/study',     label: '📚 Study Modules'  },
-            { to: '/blog',      label: '📰 Blog'           },
+            { to: '/mock-exam', label: '📝 Mock Exam'     },
+            { to: '/tutorials', label: '🎥 Tutorials'     },
+            { to: '/study',     label: '📚 Study Modules' },
+            { to: '/blog',      label: '📰 Blog'          },
+            { to: '/pricing',   label: '⭐ Upgrade Plan'  },
           ].map(({ to, label }) => (
             <Link
               key={to}
@@ -504,16 +489,13 @@ export default function Chat() {
                          hover:bg-slate-100 transition-colors"
               aria-label="Toggle sidebar"
             >
-              <svg className="w-5 h-5" fill="none"
-                   stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round"
                       strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
               </svg>
             </button>
             <div>
-              <h1 className="text-lg font-bold text-slate-900">
-                AI Coach
-              </h1>
+              <h1 className="text-lg font-bold text-slate-900">AI Coach</h1>
               <p className="text-xs text-slate-500">
                 {progress.stats.totalAttempts > 0
                   ? `${progress.stats.overallAccuracy}% accuracy • ${progress.stats.totalAttempts} questions done`
@@ -522,7 +504,6 @@ export default function Chat() {
               </p>
             </div>
           </div>
-
           <div className="flex items-center gap-2">
             <Link to="/mock-exam"
                   className="hidden sm:block text-xs text-slate-500
@@ -536,24 +517,25 @@ export default function Chat() {
             </Link>
             <button
               onClick={startNewChat}
-              className="px-3 py-1.5 text-xs font-medium border
-                         border-slate-200 rounded-lg hover:bg-slate-50
-                         transition-colors"
+              className="px-3 py-1.5 text-xs font-medium border border-slate-200
+                         rounded-lg hover:bg-slate-50 transition-colors"
             >
               + New
             </button>
           </div>
         </div>
 
+        {/* Daily limit bar for free users */}
+        {isFree && (
+          <DailyLimitBar type="aiMessages" checkLimit={checkLimit} />
+        )}
+
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4
-                        bg-slate-50 min-h-0">
+        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 bg-slate-50 min-h-0">
           {messages.map((msg, i) => (
             <div
               key={i}
-              className={`flex ${
-                msg.role === 'user' ? 'justify-end' : 'justify-start'
-              }`}
+              className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
             >
               <div className={`
                 max-w-[85%] rounded-xl px-4 py-3 text-sm
@@ -564,12 +546,9 @@ export default function Chat() {
               `}>
                 {msg.role === 'assistant' ? (
                   <>
-                    {/* Markdown content */}
                     <div className="prose prose-sm prose-slate max-w-none">
                       <ReactMarkdown>{msg.content}</ReactMarkdown>
                     </div>
-
-                    {/* Sources */}
                     {msg.sources && msg.sources.length > 0 && (
                       <div className="mt-3 pt-3 border-t border-slate-100">
                         <p className="text-[10px] font-bold text-slate-400
@@ -578,10 +557,8 @@ export default function Chat() {
                         </p>
                         <ol className="space-y-1.5">
                           {msg.sources.map(s => (
-                            <li key={s.number}
-                                className="text-xs flex gap-2 items-start">
-                              <span className="font-mono font-bold
-                                               text-slate-400 shrink-0">
+                            <li key={s.number} className="text-xs flex gap-2 items-start">
+                              <span className="font-mono font-bold text-slate-400 shrink-0">
                                 [{s.number}]
                               </span>
                               <a
@@ -602,16 +579,13 @@ export default function Chat() {
                         </ol>
                       </div>
                     )}
-
-                    {/* Copy + timestamp */}
-                    <div className="flex items-center justify-between
-                                    mt-2 pt-2 border-t border-slate-50">
+                    <div className="flex items-center justify-between mt-2 pt-2
+                                    border-t border-slate-50">
                       <CopyButton text={msg.content} />
                       {msg.timestamp && (
                         <span className="text-[10px] text-slate-300">
                           {new Date(msg.timestamp).toLocaleTimeString([], {
-                            hour:   '2-digit',
-                            minute: '2-digit',
+                            hour: '2-digit', minute: '2-digit',
                           })}
                         </span>
                       )}
@@ -623,8 +597,7 @@ export default function Chat() {
                     {msg.timestamp && (
                       <span className="text-[10px] text-blue-200 mt-1 block text-right">
                         {new Date(msg.timestamp).toLocaleTimeString([], {
-                          hour:   '2-digit',
-                          minute: '2-digit',
+                          hour: '2-digit', minute: '2-digit',
                         })}
                       </span>
                     )}
@@ -633,13 +606,11 @@ export default function Chat() {
               </div>
             </div>
           ))}
-
-          {/* Typing indicator */}
           {loading && <TypingIndicator />}
-          <div ref={bottomRef} />
+          <div ref={chatBottomRef} />
         </div>
 
-        {/* Quick prompts — only on new chat */}
+        {/* Quick prompts */}
         {isNewChat && !loading && (
           <div className="px-4 py-2 bg-white border-t border-slate-100
                           flex gap-2 overflow-x-auto shrink-0">
@@ -662,11 +633,10 @@ export default function Chat() {
           </div>
         )}
 
-        {/* Input form */}
+        {/* Input */}
         <form
           onSubmit={sendMessage}
-          className="flex gap-3 px-4 py-3 border-t border-slate-200
-                     bg-white shrink-0"
+          className="flex gap-3 px-4 py-3 border-t border-slate-200 bg-white shrink-0"
         >
           <div className="flex-1 relative">
             <textarea
@@ -679,25 +649,22 @@ export default function Chat() {
               }}
               onKeyDown={handleKeyDown}
               placeholder={
-                progress.weakTopics.length > 0
-                  ? `Ask about ${progress.weakTopics[0]}… (Shift+Enter for new line)`
-                  : 'Ask a bar exam question… (Shift+Enter for new line)'
+                isFree
+                  ? `Ask a question (${checkLimit('aiMessages').remaining} messages left today)…`
+                  : progress.weakTopics.length > 0
+                    ? `Ask about ${progress.weakTopics[0]}…`
+                    : 'Ask a bar exam question…'
               }
               rows={1}
               className="w-full border border-slate-200 rounded-xl px-4 py-2.5
-                         text-sm resize-none focus:outline-none
-                         focus:border-blue-500 transition-colors
-                         max-h-32 overflow-y-auto"
+                         text-sm resize-none focus:outline-none focus:border-blue-500
+                         transition-colors max-h-32 overflow-y-auto"
               style={{ fieldSizing: 'content' }}
               disabled={loading}
             />
-            {/* Char count */}
             {input.length > MAX_INPUT_CHARS * 0.8 && (
               <span className={`absolute bottom-2 right-3 text-[10px]
-                ${input.length >= MAX_INPUT_CHARS
-                  ? 'text-red-500'
-                  : 'text-slate-400'
-                }`}>
+                ${input.length >= MAX_INPUT_CHARS ? 'text-red-500' : 'text-slate-400'}`}>
                 {input.length}/{MAX_INPUT_CHARS}
               </span>
             )}
@@ -711,11 +678,10 @@ export default function Chat() {
                        disabled:opacity-60 shrink-0 min-h-[44px]
                        flex items-center gap-1"
           >
-            {loading ? (
-              <LoadingSpinner size="sm" color="white" />
-            ) : (
-              <>Send <span className="hidden sm:inline">→</span></>
-            )}
+            {loading
+              ? <LoadingSpinner size="sm" color="white" />
+              : <>Send <span className="hidden sm:inline">→</span></>
+            }
           </button>
         </form>
       </div>

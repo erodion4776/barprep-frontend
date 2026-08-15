@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { supabase } from '../api/client'
+import { Link, useLocation, useNavigate }   from 'react-router-dom'
+import { supabase }                         from '../api/client'
+import { useSubscription }                  from '../context/SubscriptionContext'
 
 const NAV_LINKS = [
   { to: '/',          label: 'Home'      },
@@ -8,10 +9,9 @@ const NAV_LINKS = [
   { to: '/tutorials', label: 'Tutorials' },
   { to: '/study',     label: 'Study'     },
   { to: '/mock-exam', label: 'Mock Exam' },
-  { to: '/blog',      label: 'Blog'      }, // ← NEW
+  { to: '/blog',      label: 'Blog'      },
 ]
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
 function getInitials(email = '') {
   return email.slice(0, 2).toUpperCase()
 }
@@ -29,15 +29,16 @@ async function syncProfile(u) {
   }
 }
 
-// ── Component ─────────────────────────────────────────────────────────────────
 export default function Navbar() {
   const { pathname } = useLocation()
   const navigate     = useNavigate()
 
-  const [menuOpen,   setMenuOpen]   = useState(false)
-  const [user,       setUser]       = useState(null)
-  const [isAdmin,    setIsAdmin]    = useState(false)
-  const [scrolled,   setScrolled]   = useState(false)
+  const { plan, isFree } = useSubscription()
+
+  const [menuOpen,     setMenuOpen]     = useState(false)
+  const [user,         setUser]         = useState(null)
+  const [isAdmin,      setIsAdmin]      = useState(false)
+  const [scrolled,     setScrolled]     = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
 
   // ── Scroll shadow ──────────────────────────────────────────────────────────
@@ -47,13 +48,13 @@ export default function Navbar() {
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
 
-  // ── Close mobile menu on route change ─────────────────────────────────────
+  // ── Close menus on route change ────────────────────────────────────────────
   useEffect(() => {
     setMenuOpen(false)
     setUserMenuOpen(false)
   }, [pathname])
 
-  // ── Auth state ────────────────────────────────────────────────────────────
+  // ── Auth state ─────────────────────────────────────────────────────────────
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       const u = session?.user ?? null
@@ -76,7 +77,6 @@ export default function Navbar() {
 
   const checkAdmin = useCallback((u) => {
     if (!u) { setIsAdmin(false); return }
-    // Check admin via user metadata or a known admin email list
     const adminFlag = u.user_metadata?.is_admin
     setIsAdmin(!!adminFlag)
   }, [])
@@ -94,6 +94,13 @@ export default function Navbar() {
   // ── Active check ───────────────────────────────────────────────────────────
   const isActive = (to) =>
     to === '/' ? pathname === '/' : pathname.startsWith(to)
+
+  // ── Plan badge config ──────────────────────────────────────────────────────
+  const planBadge = {
+    free:     { label: 'Free Plan',    bg: 'bg-slate-100',  text: 'text-slate-600'   },
+    pro:      { label: '🔥 Pro Plan',  bg: 'bg-blue-100',   text: 'text-blue-700'    },
+    barready: { label: '👑 Bar Ready', bg: 'bg-purple-100', text: 'text-purple-700'  },
+  }[plan] || { label: 'Free Plan', bg: 'bg-slate-100', text: 'text-slate-600' }
 
   return (
     <nav
@@ -140,13 +147,26 @@ export default function Navbar() {
               </Link>
             ))}
 
-            {/* Admin link — only visible to admins */}
+            {/* Pricing link */}
+            <Link
+              to="/pricing"
+              className={`
+                px-3 py-2 rounded-lg text-sm font-medium transition-colors
+                ${isActive('/pricing')
+                  ? 'bg-blue-50 text-blue-600'
+                  : 'text-blue-600 hover:bg-blue-50'
+                }
+              `}
+            >
+              ⭐ Pricing
+            </Link>
+
+            {/* Admin link */}
             {isAdmin && (
               <Link
                 to="/admin"
                 className={`
-                  px-3 py-2 rounded-lg text-sm font-medium
-                  transition-colors duration-200
+                  px-3 py-2 rounded-lg text-sm font-medium transition-colors
                   ${isActive('/admin')
                     ? 'bg-amber-50 text-amber-600'
                     : 'text-amber-600 hover:bg-amber-50'
@@ -184,39 +204,99 @@ export default function Navbar() {
 
                 {/* Dropdown */}
                 {userMenuOpen && (
-                  <div className="absolute right-0 top-full mt-2 w-56
-                                  bg-white border border-slate-200 rounded-xl
-                                  shadow-lg py-1 z-50">
-                    <div className="px-4 py-2 border-b border-slate-100">
-                      <p className="text-xs text-slate-400">Signed in as</p>
-                      <p className="text-sm font-medium text-slate-700 truncate">
-                        {user.email}
-                      </p>
+                  <>
+                    {/* Backdrop to close dropdown */}
+                    <div
+                      className="fixed inset-0 z-40"
+                      onClick={() => setUserMenuOpen(false)}
+                    />
+
+                    <div className="absolute right-0 top-full mt-2 w-64
+                                    bg-white border border-slate-200 rounded-xl
+                                    shadow-lg py-1 z-50">
+
+                      {/* User info + plan badge */}
+                      <div className="px-4 py-3 border-b border-slate-100">
+                        <p className="text-xs text-slate-400">Signed in as</p>
+                        <p className="text-sm font-medium text-slate-700 truncate">
+                          {user.email}
+                        </p>
+                        <div className="flex items-center gap-2 mt-2">
+                          <span className={`text-[10px] font-bold px-2.5 py-1
+                                           rounded-full ${planBadge.bg} ${planBadge.text}`}>
+                            {planBadge.label}
+                          </span>
+                          {isFree && (
+                            <Link
+                              to="/pricing"
+                              onClick={() => setUserMenuOpen(false)}
+                              className="text-[10px] text-blue-600 hover:underline
+                                         font-bold"
+                            >
+                              Upgrade →
+                            </Link>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Menu links */}
+                      <Link
+                        to="/home"
+                        onClick={() => setUserMenuOpen(false)}
+                        className="block px-4 py-2.5 text-sm text-slate-600
+                                   hover:bg-slate-50 transition-colors"
+                      >
+                        📊 Dashboard
+                      </Link>
+                      <Link
+                        to="/chat"
+                        onClick={() => setUserMenuOpen(false)}
+                        className="block px-4 py-2.5 text-sm text-slate-600
+                                   hover:bg-slate-50 transition-colors"
+                      >
+                        💬 My Sessions
+                      </Link>
+                      <Link
+                        to="/settings"
+                        onClick={() => setUserMenuOpen(false)}
+                        className="block px-4 py-2.5 text-sm text-slate-600
+                                   hover:bg-slate-50 transition-colors"
+                      >
+                        ⚙ Settings
+                      </Link>
+                      <Link
+                        to="/pricing"
+                        onClick={() => setUserMenuOpen(false)}
+                        className="block px-4 py-2.5 text-sm text-slate-600
+                                   hover:bg-slate-50 transition-colors"
+                      >
+                        ⭐ {isFree ? 'Upgrade Plan' : 'Manage Plan'}
+                      </Link>
+
+                      {/* Admin link in dropdown */}
+                      {isAdmin && (
+                        <Link
+                          to="/admin"
+                          onClick={() => setUserMenuOpen(false)}
+                          className="block px-4 py-2.5 text-sm text-amber-600
+                                     hover:bg-amber-50 transition-colors"
+                        >
+                          ⚙ Admin Dashboard
+                        </Link>
+                      )}
+
+                      <div className="border-t border-slate-100 mt-1" />
+
+                      <button
+                        onClick={handleSignOut}
+                        className="w-full text-left px-4 py-2.5 text-sm
+                                   text-red-600 hover:bg-red-50
+                                   transition-colors"
+                      >
+                        → Sign Out
+                      </button>
                     </div>
-                    <Link
-                      to="/settings"
-                      className="block px-4 py-2 text-sm text-slate-600
-                                 hover:bg-slate-50 transition-colors"
-                    >
-                      ⚙ Settings
-                    </Link>
-                    <Link
-                      to="/chat"
-                      className="block px-4 py-2 text-sm text-slate-600
-                                 hover:bg-slate-50 transition-colors"
-                    >
-                      💬 My Sessions
-                    </Link>
-                    <div className="border-t border-slate-100 mt-1" />
-                    <button
-                      onClick={handleSignOut}
-                      className="w-full text-left px-4 py-2 text-sm
-                                 text-red-600 hover:bg-red-50
-                                 transition-colors"
-                    >
-                      → Sign Out
-                    </button>
-                  </div>
+                  </>
                 )}
               </div>
             ) : (
@@ -272,10 +352,12 @@ export default function Navbar() {
         className={`
           sm:hidden border-t border-slate-100 bg-white
           overflow-hidden transition-all duration-300 ease-in-out
-          ${menuOpen ? 'max-h-[600px] opacity-100' : 'max-h-0 opacity-0'}
+          ${menuOpen ? 'max-h-[800px] opacity-100' : 'max-h-0 opacity-0'}
         `}
       >
         <div className="px-4 py-3 space-y-1">
+
+          {/* Nav links */}
           {NAV_LINKS.map(({ to, label }) => (
             <Link
               key={to}
@@ -293,35 +375,74 @@ export default function Navbar() {
             </Link>
           ))}
 
+          {/* Pricing link */}
+          <Link
+            to="/pricing"
+            className={`
+              block px-4 py-3 rounded-lg text-sm font-medium
+              transition-colors duration-200
+              ${isActive('/pricing')
+                ? 'bg-blue-50 text-blue-600'
+                : 'text-blue-600 hover:bg-blue-50'
+              }
+            `}
+          >
+            ⭐ Pricing
+          </Link>
+
+          {/* Admin link */}
           {isAdmin && (
             <Link
               to="/admin"
-              className="block px-4 py-3 rounded-lg text-sm
-                         font-medium text-amber-600 hover:bg-amber-50
-                         transition-colors"
+              className="block px-4 py-3 rounded-lg text-sm font-medium
+                         text-amber-600 hover:bg-amber-50 transition-colors"
             >
               ⚙ Admin
             </Link>
           )}
 
-          {/* Mobile auth */}
+          {/* Mobile auth section */}
           {user ? (
             <div className="border-t border-slate-100 pt-3 mt-2 space-y-1">
-              {/* Avatar row */}
-              <div className="flex items-center gap-3 px-4 py-2">
-                <div className="w-8 h-8 bg-blue-600 rounded-full
+
+              {/* Avatar + info + plan badge */}
+              <div className="flex items-center gap-3 px-4 py-3">
+                <div className="w-10 h-10 bg-blue-600 rounded-full
                                 flex items-center justify-center shrink-0">
-                  <span className="text-white text-xs font-bold">
+                  <span className="text-white text-sm font-bold">
                     {getInitials(user.email)}
                   </span>
                 </div>
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                   <p className="text-xs text-slate-400">Signed in as</p>
                   <p className="text-sm font-medium text-slate-700 truncate">
                     {user.email}
                   </p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className={`text-[10px] font-bold px-2 py-0.5
+                                     rounded-full ${planBadge.bg} ${planBadge.text}`}>
+                      {planBadge.label}
+                    </span>
+                    {isFree && (
+                      <Link
+                        to="/pricing"
+                        className="text-[10px] text-blue-600 hover:underline font-bold"
+                      >
+                        Upgrade →
+                      </Link>
+                    )}
+                  </div>
                 </div>
               </div>
+
+              {/* Mobile menu links */}
+              <Link
+                to="/home"
+                className="block px-4 py-3 text-sm text-slate-600
+                           hover:bg-slate-100 rounded-lg transition-colors"
+              >
+                📊 Dashboard
+              </Link>
               <Link
                 to="/settings"
                 className="block px-4 py-3 text-sm text-slate-600
@@ -329,11 +450,20 @@ export default function Navbar() {
               >
                 ⚙ Settings
               </Link>
+              <Link
+                to="/pricing"
+                className="block px-4 py-3 text-sm text-slate-600
+                           hover:bg-slate-100 rounded-lg transition-colors"
+              >
+                ⭐ {isFree ? 'Upgrade Plan' : 'Manage Plan'}
+              </Link>
+
+              {/* Sign out */}
               <button
                 onClick={handleSignOut}
-                className="w-full text-left px-4 py-3 text-sm
-                           font-medium text-red-600 hover:bg-red-50
-                           rounded-lg transition-colors"
+                className="w-full text-left px-4 py-3 text-sm font-medium
+                           text-red-600 hover:bg-red-50 rounded-lg
+                           transition-colors"
               >
                 → Sign Out
               </button>

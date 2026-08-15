@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import { useParams, Link }         from 'react-router-dom'
-import { apiClient, supabase }     from '../api/client'
-import LoadingSpinner              from '../components/LoadingSpinner'
-import ReactMarkdown               from 'react-markdown'
-import { useProgress }             from '../context/ProgressContext'
+import { useParams, Link, useNavigate }  from 'react-router-dom'
+import { apiClient, supabase }           from '../api/client'
+import LoadingSpinner                    from '../components/LoadingSpinner'
+import ReactMarkdown                     from 'react-markdown'
+import { useProgress }                   from '../context/ProgressContext'
+import { useSubscription }               from '../context/SubscriptionContext'
+import { UpgradeBanner }                 from '../components/UpgradePrompt'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function extractYouTubeId(url) {
@@ -23,13 +25,13 @@ function buildGreeting(moduleData, progress) {
   if (stats.totalAttempts > 0) {
     msg += `📊 Your overall accuracy is **${stats.overallAccuracy}%**. `
     if (isWeak) {
-      msg += `**${moduleData.topic}** is one of your focus areas — let's make the most of this lecture!\n\n`
+      msg += `**${moduleData.topic}** is one of your focus areas — let's make the most of this!\n\n`
     } else {
       msg += `\n\n`
     }
   }
 
-  msg += `I can help you understand the concepts, answer questions about the material, or quiz you on key points. What would you like to know?`
+  msg += `I can help you understand the concepts, answer questions, or quiz you. What would you like to know?`
   return msg
 }
 
@@ -101,40 +103,86 @@ function VideoPlayer({ url, title }) {
   )
 }
 
+// ── Locked chat overlay ───────────────────────────────────────────────────────
+function LockedChat() {
+  return (
+    <div className="flex-1 flex flex-col items-center justify-center
+                    p-6 text-center space-y-4 bg-slate-50">
+      <div className="text-4xl">🔒</div>
+      <div>
+        <h3 className="font-bold text-slate-900 text-sm">
+          AI Coach is a Pro Feature
+        </h3>
+        <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+          Upgrade to Pro to ask the AI coach questions about this video
+          in real time.
+        </p>
+      </div>
+      <div className="space-y-2 w-full">
+        <Link
+          to="/pricing"
+          className="block w-full py-2.5 bg-blue-600 text-white text-xs
+                     font-bold rounded-xl hover:bg-blue-700 transition-colors
+                     text-center"
+        >
+          🚀 Pro — $100/month
+        </Link>
+        <Link
+          to="/pricing"
+          className="block w-full py-2.5 bg-purple-600 text-white text-xs
+                     font-bold rounded-xl hover:bg-purple-700 transition-colors
+                     text-center"
+        >
+          👑 Bar Ready — $400/year
+        </Link>
+      </div>
+      <p className="text-[10px] text-slate-400">
+        You can still watch the video on the free plan
+      </p>
+    </div>
+  )
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 export default function ModuleDetail() {
-  const { id }   = useParams()
-  const progress = useProgress().progress
+  const { id }     = useParams()
+  const navigate   = useNavigate()
+  const progress   = useProgress().progress
   const { markModuleWatched, getProgressSummary } = useProgress()
+  const { canUse, isFree }                        = useSubscription()
 
-  const [module,       setModule]       = useState(null)
-  const [nextModule,   setNextModule]   = useState(null)
-  const [loading,      setLoading]      = useState(true)
-  const [errorType,    setErrorType]    = useState(null) // 'not_found' | 'network'
-  const [errorMsg,     setErrorMsg]     = useState('')
-  const [question,     setQuestion]     = useState('')
-  const [chatHistory,  setChatHistory]  = useState([])
-  const [chatLoading,  setChatLoading]  = useState(false)
+  // Can use AI chat on this page
+  const canUseAI = canUse('tutorialDetail')
+
+  const [module,      setModule]      = useState(null)
+  const [nextModule,  setNextModule]  = useState(null)
+  const [loading,     setLoading]     = useState(true)
+  const [errorType,   setErrorType]   = useState(null)
+  const [errorMsg,    setErrorMsg]    = useState('')
+  const [question,    setQuestion]    = useState('')
+  const [chatHistory, setChatHistory] = useState([])
+  const [chatLoading, setChatLoading] = useState(false)
 
   const chatBottomRef = useRef(null)
   const inputRef      = useRef(null)
 
-  // ── Restore chat from sessionStorage ─────────────────────────────────────
+  // ── Restore chat from sessionStorage ──────────────────────────────────────
   useEffect(() => {
+    if (!canUseAI) return
     const saved = sessionStorage.getItem(`module_chat_${id}`)
     if (saved) {
       try { setChatHistory(JSON.parse(saved)) } catch {}
     }
-  }, [id])
+  }, [id, canUseAI])
 
-  // ── Auto-scroll ───────────────────────────────────────────────────────────
+  // ── Auto-scroll ────────────────────────────────────────────────────────────
   useEffect(() => {
     chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [chatHistory, chatLoading])
 
-  // ── Load module ───────────────────────────────────────────────────────────
+  // ── Load module ────────────────────────────────────────────────────────────
   const loadModule = useCallback(async () => {
-    if (progress.loading) return // wait for progress to be ready
+    if (progress.loading) return
 
     setLoading(true)
     setErrorType(null)
@@ -159,13 +207,15 @@ export default function ModuleDetail() {
       setModule(data)
       await markModuleWatched(data.id, data.title, data.topic)
 
-      // Build greeting only if no saved chat
-      const saved = sessionStorage.getItem(`module_chat_${id}`)
-      if (!saved) {
-        const greeting = buildGreeting(data, progress)
-        const initial  = [{ role: 'assistant', content: greeting, isGreeting: true }]
-        setChatHistory(initial)
-        sessionStorage.setItem(`module_chat_${id}`, JSON.stringify(initial))
+      // Build greeting only if AI is available and no saved chat
+      if (canUseAI) {
+        const saved = sessionStorage.getItem(`module_chat_${id}`)
+        if (!saved) {
+          const greeting = buildGreeting(data, progress)
+          const initial  = [{ role: 'assistant', content: greeting, isGreeting: true }]
+          setChatHistory(initial)
+          sessionStorage.setItem(`module_chat_${id}`, JSON.stringify(initial))
+        }
       }
 
       // Load next module in same topic
@@ -189,17 +239,17 @@ export default function ModuleDetail() {
     } finally {
       setLoading(false)
     }
-  }, [id, progress.loading, markModuleWatched])
+  }, [id, progress.loading, markModuleWatched, canUseAI])
 
   useEffect(() => {
     loadModule()
   }, [loadModule])
 
-  // ── Ask question ──────────────────────────────────────────────────────────
+  // ── Ask question ───────────────────────────────────────────────────────────
   const askQuestion = useCallback(async (e) => {
     e?.preventDefault()
     const text = question.trim()
-    if (!text || chatLoading || !module) return
+    if (!text || chatLoading || !module || !canUseAI) return
 
     setQuestion('')
     setChatLoading(true)
@@ -208,22 +258,18 @@ export default function ModuleDetail() {
     setChatHistory(withUser)
 
     try {
+      // Short context to save tokens
       const contextMsg = [
-        '[MODULE CONTEXT]',
-        `Lecture: "${module.title}" | Topic: ${module.topic}`,
-        module.ai_summary ? `Summary: ${module.ai_summary}` : '',
+        `[Lecture: "${module.title}" | Topic: ${module.topic}]`,
+        module.ai_summary ? `[Summary: ${module.ai_summary.substring(0, 200)}]` : '',
+        `[Student accuracy: ${progress.stats?.overallAccuracy || 0}%]`,
         '',
-        '[STUDENT PROGRESS]',
-        getProgressSummary(),
-        '',
-        '[STUDENT QUESTION]',
-        text,
-      ].join('\n').trim()
+        `Student question: ${text}`,
+      ].filter(Boolean).join('\n')
 
-      // Filter greeting from history sent to API
       const history = withUser
         .filter(m => !m.isGreeting)
-        .slice(-8)
+        .slice(-6) // Keep last 6 messages to save tokens
         .map(({ role, content }) => ({ role, content }))
 
       const res = await apiClient.chat(contextMsg, history)
@@ -235,40 +281,45 @@ export default function ModuleDetail() {
       setChatHistory(final)
       sessionStorage.setItem(`module_chat_${id}`, JSON.stringify(final))
     } catch (err) {
+      const isRateLimit = err.message?.includes('429') ||
+                          err.message?.includes('rate limit')
+
+      const errContent = isRateLimit
+        ? '⏱️ Rate limit hit — please wait a few seconds and try again.'
+        : `Error: ${err.message}. Please try again.`
+
       const errMsg = [
         ...withUser,
-        {
-          role:    'assistant',
-          content: `I encountered an error: ${err.message}. Please try again.`,
-        },
+        { role: 'assistant', content: errContent },
       ]
       setChatHistory(errMsg)
     } finally {
       setChatLoading(false)
       inputRef.current?.focus()
     }
-  }, [question, chatLoading, module, chatHistory, getProgressSummary, id])
+  }, [question, chatLoading, module, chatHistory,
+      getProgressSummary, id, canUseAI, progress.stats])
 
-  // ── Derived values ────────────────────────────────────────────────────────
+  // ── Derived values ─────────────────────────────────────────────────────────
   const isWeakTopic   = module ? progress.weakTopics.includes(module.topic)   : false
   const isStrongTopic = module ? progress.strongTopics.includes(module.topic) : false
   const topicPerf     = module ? progress.stats.topicPerformance?.[module.topic] : null
 
   const smartQuickQuestions = useMemo(() => {
-    if (!module) return []
+    if (!module || !canUseAI) return []
     return [
       isWeakTopic
-        ? `I struggle with ${module.topic} — explain simply`
+        ? `Explain ${module.topic} simply`
         : `Summarize this lecture`,
       'Quiz me on this topic',
-      'What are the key rules to know?',
+      'What are the key rules?',
       isWeakTopic
         ? `Common mistakes in ${module.topic}?`
         : 'What will the bar exam test here?',
     ]
-  }, [module, isWeakTopic])
+  }, [module, isWeakTopic, canUseAI])
 
-  // ── Loading ───────────────────────────────────────────────────────────────
+  // ── Loading ────────────────────────────────────────────────────────────────
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -277,7 +328,7 @@ export default function ModuleDetail() {
     )
   }
 
-  // ── Error ─────────────────────────────────────────────────────────────────
+  // ── Error ──────────────────────────────────────────────────────────────────
   if (errorType || !module) {
     return (
       <div className="max-w-md mx-auto text-center py-12 space-y-4">
@@ -313,17 +364,11 @@ export default function ModuleDetail() {
 
       {/* ── Breadcrumb ── */}
       <div className="flex items-center gap-2 text-sm text-slate-500 flex-wrap">
-        <Link to="/" className="hover:text-blue-600 transition-colors">
-          Home
-        </Link>
+        <Link to="/"         className="hover:text-blue-600 transition-colors">Home</Link>
         <span>→</span>
-        <Link to="/tutorials" className="hover:text-blue-600 transition-colors">
-          Tutorials
-        </Link>
+        <Link to="/tutorials" className="hover:text-blue-600 transition-colors">Tutorials</Link>
         <span>→</span>
-        <span className="text-slate-700 truncate max-w-[200px]">
-          {module.title}
-        </span>
+        <span className="text-slate-700 truncate max-w-[200px]">{module.title}</span>
       </div>
 
       {/* ── Module Header ── */}
@@ -347,6 +392,13 @@ export default function ModuleDetail() {
                 ✅ Strong Area
               </span>
             )}
+            {/* Free plan badge */}
+            {isFree && (
+              <span className="text-xs font-bold px-2 py-0.5 bg-slate-100
+                               text-slate-600 rounded-full">
+                Free Preview
+              </span>
+            )}
           </div>
           <h1 className="text-2xl sm:text-3xl font-black text-slate-900">
             {module.title}
@@ -364,12 +416,8 @@ export default function ModuleDetail() {
               }`}>
               {topicPerf.accuracy}%
             </div>
-            <div className="text-[10px] text-slate-400 uppercase">
-              Your Accuracy
-            </div>
-            <div className="text-xs text-slate-500">
-              {topicPerf.attempts} attempts
-            </div>
+            <div className="text-[10px] text-slate-400 uppercase">Your Accuracy</div>
+            <div className="text-xs text-slate-500">{topicPerf.attempts} attempts</div>
           </div>
         )}
       </div>
@@ -408,6 +456,11 @@ export default function ModuleDetail() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* ── Free plan AI coach prompt ── */}
+      {isFree && (
+        <UpgradeBanner feature="tutorialDetail" />
       )}
 
       {/* ── Main Grid ── */}
@@ -457,9 +510,8 @@ export default function ModuleDetail() {
               </div>
               <Link
                 to={`/tutorials/${nextModule.id}`}
-                className="shrink-0 px-4 py-2 bg-blue-600 text-white
-                           text-xs font-bold rounded-xl hover:bg-blue-700
-                           transition-colors"
+                className="shrink-0 px-4 py-2 bg-blue-600 text-white text-xs
+                           font-bold rounded-xl hover:bg-blue-700 transition-colors"
               >
                 Next →
               </Link>
@@ -467,45 +519,24 @@ export default function ModuleDetail() {
           )}
 
           {/* What to do next */}
-          <div className="bg-slate-50 border border-slate-200 rounded-2xl
-                          p-4 space-y-3">
-            <h3 className="text-sm font-bold text-slate-700">
-              ⚡ What to Do Next
-            </h3>
+          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-3">
+            <h3 className="text-sm font-bold text-slate-700">⚡ What to Do Next</h3>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               {[
-                {
-                  to:      '/mock-exam',
-                  icon:    '📝',
-                  title:   'Practice Questions',
-                  desc:    `Test your ${module.topic} knowledge`,
-                },
-                {
-                  to:      '/chat',
-                  icon:    '🤖',
-                  title:   'Ask AI Coach',
-                  desc:    'Deep dive into concepts',
-                },
-                {
-                  to:      '/blog',
-                  icon:    '📰',
-                  title:   'Bar Prep Blog',
-                  desc:    `Tips on ${module.topic}`,
-                },
+                { to: '/mock-exam', icon: '📝', title: 'Practice Questions', desc: `Test your ${module.topic} knowledge` },
+                { to: '/chat',      icon: '🤖', title: 'Ask AI Coach',       desc: 'Deep dive into concepts'            },
+                { to: '/blog',      icon: '📰', title: 'Bar Prep Blog',      desc: `Tips on ${module.topic}`            },
               ].map(({ to, icon, title, desc }) => (
                 <Link
                   key={to}
                   to={to}
-                  className="flex items-center gap-2 p-3 bg-white
-                             rounded-xl border border-slate-200
-                             hover:border-blue-300 hover:bg-blue-50
-                             transition-all"
+                  className="flex items-center gap-2 p-3 bg-white rounded-xl
+                             border border-slate-200 hover:border-blue-300
+                             hover:bg-blue-50 transition-all"
                 >
                   <span className="text-lg">{icon}</span>
                   <div>
-                    <div className="font-semibold text-xs text-slate-800">
-                      {title}
-                    </div>
+                    <div className="font-semibold text-xs text-slate-800">{title}</div>
                     <div className="text-[10px] text-slate-500">{desc}</div>
                   </div>
                 </Link>
@@ -521,106 +552,116 @@ export default function ModuleDetail() {
                           sticky top-20 overflow-hidden">
 
             {/* Chat header */}
-            <div className="p-4 border-b border-slate-100 bg-slate-50">
+            <div className="p-4 border-b border-slate-100 bg-slate-50 shrink-0">
               <h3 className="font-semibold text-slate-900 text-sm">
                 🤖 AI Lecture Coach
               </h3>
               <p className="text-xs text-slate-500 mt-0.5">
-                {isWeakTopic
-                  ? `⚠️ Focus area — I'll explain carefully`
-                  : 'Ask questions about this lecture'
+                {!canUseAI
+                  ? '🔒 Pro feature — upgrade to ask questions'
+                  : isWeakTopic
+                    ? `⚠️ Focus area — I'll explain carefully`
+                    : 'Ask questions about this lecture'
                 }
               </p>
             </div>
 
-            {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-3">
-              {chatHistory.map((msg, i) => (
-                <div
-                  key={i}
-                  className={`flex ${
-                    msg.role === 'user' ? 'justify-end' : 'justify-start'
-                  }`}
-                >
-                  <div className={`
-                    max-w-[90%] rounded-xl px-3 py-2 text-xs leading-relaxed
-                    ${msg.role === 'user'
-                      ? 'bg-blue-600 text-white rounded-br-sm'
-                      : 'bg-slate-100 text-slate-800 rounded-bl-sm'
-                    }
-                  `}>
-                    {msg.role === 'assistant' ? (
-                      <>
-                        <div className="prose prose-xs prose-slate max-w-none">
-                          <ReactMarkdown>{msg.content}</ReactMarkdown>
-                        </div>
-                        <CopyButton text={msg.content} />
-                      </>
-                    ) : (
-                      <p>{msg.content}</p>
-                    )}
-                  </div>
+            {/* ── Locked state for free users ── */}
+            {!canUseAI ? (
+              <LockedChat />
+            ) : (
+              <>
+                {/* Messages */}
+                <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                  {chatHistory.map((msg, i) => (
+                    <div
+                      key={i}
+                      className={`flex ${
+                        msg.role === 'user' ? 'justify-end' : 'justify-start'
+                      }`}
+                    >
+                      <div className={`
+                        max-w-[90%] rounded-xl px-3 py-2 text-xs leading-relaxed
+                        ${msg.role === 'user'
+                          ? 'bg-blue-600 text-white rounded-br-sm'
+                          : 'bg-slate-100 text-slate-800 rounded-bl-sm'
+                        }
+                      `}>
+                        {msg.role === 'assistant' ? (
+                          <>
+                            <div className="prose prose-xs prose-slate max-w-none">
+                              <ReactMarkdown>{msg.content}</ReactMarkdown>
+                            </div>
+                            <CopyButton text={msg.content} />
+                          </>
+                        ) : (
+                          <p>{msg.content}</p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+
+                  {chatLoading && <TypingIndicator />}
+                  <div ref={chatBottomRef} />
                 </div>
-              ))}
 
-              {chatLoading && <TypingIndicator />}
-              <div ref={chatBottomRef} />
-            </div>
+                {/* Quick questions */}
+                <div className="px-3 py-2 border-t border-slate-100
+                                flex gap-2 overflow-x-auto shrink-0">
+                  {smartQuickQuestions.map(q => (
+                    <button
+                      key={q}
+                      onClick={() => {
+                        setQuestion(q)
+                        inputRef.current?.focus()
+                      }}
+                      className="text-xs bg-slate-50 border border-slate-200
+                                 rounded-full px-3 py-1 whitespace-nowrap
+                                 hover:bg-blue-50 hover:border-blue-300
+                                 text-slate-600 hover:text-blue-700
+                                 transition-colors shrink-0"
+                    >
+                      {q}
+                    </button>
+                  ))}
+                </div>
 
-            {/* Quick questions */}
-            <div className="px-3 py-2 border-t border-slate-100
-                            flex gap-2 overflow-x-auto shrink-0">
-              {smartQuickQuestions.map(q => (
-                <button
-                  key={q}
-                  onClick={() => {
-                    setQuestion(q)
-                    inputRef.current?.focus()
-                  }}
-                  className="text-xs bg-slate-50 border border-slate-200
-                             rounded-full px-3 py-1 whitespace-nowrap
-                             hover:bg-blue-50 hover:border-blue-300
-                             text-slate-600 hover:text-blue-700
-                             transition-colors shrink-0"
+                {/* Input */}
+                <form
+                  onSubmit={askQuestion}
+                  className="p-3 border-t border-slate-100 flex gap-2 shrink-0"
                 >
-                  {q}
-                </button>
-              ))}
-            </div>
-
-            {/* Input */}
-            <form
-              onSubmit={askQuestion}
-              className="p-3 border-t border-slate-100 flex gap-2 shrink-0"
-            >
-              <input
-                ref={inputRef}
-                type="text"
-                value={question}
-                onChange={e => setQuestion(e.target.value)}
-                placeholder={
-                  isWeakTopic
-                    ? `What confuses you about ${module.topic}?`
-                    : 'Ask about this lecture...'
-                }
-                className="flex-1 border border-slate-200 rounded-xl
-                           px-3 py-2 text-xs focus:outline-none
-                           focus:border-blue-500 transition-colors"
-                disabled={chatLoading}
-              />
-              <button
-                type="submit"
-                disabled={chatLoading || !question.trim()}
-                className="px-3 py-2 bg-blue-600 text-white text-xs
-                           font-bold rounded-xl hover:bg-blue-700
-                           transition-colors disabled:opacity-60 shrink-0"
-              >
-                {chatLoading ? '…' : 'Ask'}
-              </button>
-            </form>
+                  <input
+                    ref={inputRef}
+                    type="text"
+                    value={question}
+                    onChange={e => setQuestion(e.target.value)}
+                    placeholder={
+                      isWeakTopic
+                        ? `What confuses you about ${module.topic}?`
+                        : 'Ask about this lecture...'
+                    }
+                    className="flex-1 border border-slate-200 rounded-xl px-3 py-2
+                               text-xs focus:outline-none focus:border-blue-500
+                               transition-colors"
+                    disabled={chatLoading}
+                  />
+                  <button
+                    type="submit"
+                    disabled={chatLoading || !question.trim()}
+                    className="px-3 py-2 bg-blue-600 text-white text-xs font-bold
+                               rounded-xl hover:bg-blue-700 transition-colors
+                               disabled:opacity-60 shrink-0"
+                  >
+                    {chatLoading ? '…' : 'Ask'}
+                  </button>
+                </form>
+              </>
+            )}
           </div>
         </div>
       </div>
+
     </div>
   )
 }
